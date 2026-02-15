@@ -13,6 +13,14 @@ struct ContentView: View {
     @State private var showingHistory: Bool = false
     @State private var showingNotifications: Bool = false // New state for notifications
     @AppStorage("isDarkMode") private var isDarkMode = false
+    @State private var initialDisplayTime: Date = Date() // Capture the initial display time
+    
+    // Formatter for displaying only time (HH:MM)
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm" // Use "HH:mm" for 24-hour format
+        return formatter
+    }()
 
 
     var body: some View {
@@ -27,6 +35,55 @@ struct ContentView: View {
                 TimeProgressBar(timeManager: timeManager, totalMaxSeconds: 10 * 3600)
                     .frame(height: 80)
                     .padding(.vertical, 10)
+                
+                // Time Markers
+                GeometryReader { geometry in
+                    let baseTimeForMilestones = timeManager.currentSegments.first?.startTime ?? Date() // Use current time if no session active
+                    let totalMaxDuration: TimeInterval = 10 * 3600 // 10 hours in seconds
+                    
+                    HStack(spacing: 0) {
+                        // Current actual time for the first marker
+                        Text(timeFormatter.string(from: initialDisplayTime))
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                            .frame(width: 40, alignment: .leading) // Align left
+                            .offset(x: -20) // Align left edge of text with left edge of bar
+                        
+                        // Spacer to 6-hour mark
+                        // The width of the spacer needs to consider the 40pt width of the Text element itself
+                        Spacer(minLength: 0)
+                            .frame(width: max(0, (CGFloat(6 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - 40))
+
+                        // 6-hour mark
+                        Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(6 * 3600)))
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                            .frame(width: 40, alignment: .center) // Center the text
+
+                        // Spacer to 8-hour mark
+                        Spacer(minLength: 0)
+                            .frame(width: max(0, (CGFloat(8 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - (CGFloat(6 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - 40))
+
+                        // 8-hour mark
+                        Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(8 * 3600)))
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                            .frame(width: 40, alignment: .center) // Center the text
+                        
+                        // Spacer to 10-hour mark
+                        Spacer(minLength: 0)
+                            .frame(width: max(0, (CGFloat(totalMaxDuration) / CGFloat(totalMaxDuration) * geometry.size.width) - (CGFloat(8 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - 40)) // Remaining width to end, adjusted for end text
+
+                        // 10-hour mark
+                        Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(totalMaxDuration)))
+                            .font(.caption2)
+                            .foregroundColor(.primary)
+                            .frame(width: 40, alignment: .trailing) // Align right
+                            .offset(x: 20) // Align right edge of text with right edge of bar
+                    }
+                    .frame(height: 20)
+                }
+                .padding(.horizontal)
                 
                 Spacer() // Add a spacer to push the text down
                 
