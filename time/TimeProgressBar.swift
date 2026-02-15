@@ -1,6 +1,10 @@
 
 import SwiftUI
 
+extension Color {
+    static let persianGreen = Color(red: 0/255, green: 166/255, blue: 147/255)
+}
+
 struct TimeProgressBar: View {
     @ObservedObject var timeManager: TimeManager
     var totalMaxSeconds: TimeInterval // e.g., 10 hours * 3600 seconds/hour
@@ -10,7 +14,7 @@ struct TimeProgressBar: View {
             ZStack(alignment: .leading) {
                 // Background bar for total max time
                 Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(Color.persianGreen.opacity(0.8))
                     .frame(width: geometry.size.width)
 
                 ForEach(Array(timeManager.currentSegments.enumerated()), id: \.offset) { index, segment in
