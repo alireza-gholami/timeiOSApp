@@ -25,10 +25,19 @@ struct TimeProgressBar: View {
                         currentTotalOffset + CGFloat(prevSegment.duration / totalMaxSeconds) * geometry.size.width
                     }
 
+                    // Segment bar
                     Rectangle()
                         .fill(segment.type == .work ? Color.green : Color.orange)
                         .frame(width: min(segmentWidth, geometry.size.width - xOffset))
                         .offset(x: xOffset)
+                    
+                    // Time label for segment start
+                    Text(segment.startTime, style: .time)
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(90), anchor: .bottomLeading) // Rotate vertically, anchor at bottom-leading for better alignment
+                        .offset(x: xOffset - 5, y: -30) // Position at segment start, moved 5 points further left, and up above the bar
+                        .frame(width: 40) // Slightly wider frame for the rotated text
                 }
             }
             .frame(height: 80) // Fixed height for the bar
