@@ -38,7 +38,8 @@ struct ContentView: View {
                 
                 // Time Markers
                 GeometryReader { geometry in
-                    let baseTimeForMilestones = timeManager.currentSegments.first?.startTime ?? Date() // Use current time if no session active
+                    // Use the start of the first segment if available, otherwise use the fixed initialDisplayTime
+                    let baseTimeForMilestones = timeManager.currentSegments.first?.startTime ?? initialDisplayTime
                     let totalMaxDuration: TimeInterval = 10 * 3600 // 10 hours in seconds
                     
                     HStack(spacing: 0) {
