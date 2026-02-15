@@ -24,7 +24,7 @@ struct ContentView: View {
                     .foregroundStyle(.blue)
                 
                 // Time Bar Display
-                TimeProgressBar(workSeconds: timeManager.workSeconds, pauseSeconds: timeManager.pauseSeconds, totalMaxSeconds: 10 * 3600)
+                TimeProgressBar(timeManager: timeManager, totalMaxSeconds: 10 * 3600)
                     .frame(height: 80)
                     .padding(.vertical, 10)
                 

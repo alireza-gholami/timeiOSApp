@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct EditDayView: View {
@@ -12,6 +11,7 @@ struct EditDayView: View {
     
     init(day: CompletedDay) {
         self.day = day
+        // Initialize with accelerated durations
         _workMinutes = State(initialValue: day.workDuration / 60)
         _pauseMinutes = State(initialValue: day.pauseDuration / 60)
     }
@@ -20,8 +20,14 @@ struct EditDayView: View {
         NavigationView {
             Form {
                 Section(header: Text("Zeiten anpassen (in Minuten)")) {
-                    Stepper("Arbeitszeit: \(workMinutes, specifier: "%.0f") min", value: $workMinutes, in: 0...1440, step: 1)
-                    Stepper("Pausenzeit: \(pauseMinutes, specifier: "%.0f") min", value: $pauseMinutes, in: 0...1440, step: 1)
+                    Stepper(value: $workMinutes, in: 0...1440, step: 1) {
+                        Text("Arbeitszeit: \(workMinutes, specifier: "%.0f") min")
+                            .foregroundColor(.primary)
+                    }
+                    Stepper(value: $pauseMinutes, in: 0...1440, step: 1) {
+                        Text("Pausenzeit: \(pauseMinutes, specifier: "%.0f") min")
+                            .foregroundColor(.primary)
+                    }
                 }
                 
                 Section {
@@ -41,6 +47,7 @@ struct EditDayView: View {
                 }
             }
             .navigationTitle(Text(day.date, style: .date))
+            .navigationBarTitleDisplayMode(.inline) // Minimalist title display
         }
     }
 }

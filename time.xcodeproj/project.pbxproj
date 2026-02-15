@@ -31,11 +31,6 @@
 			path = time;
 			sourceTree = "<group>";
 		};
-		475C9C282F410F6E006C8DF7 /* TimeWidget */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TimeWidget;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,7 +48,6 @@
 			isa = PBXGroup;
 			children = (
 				475C9C0E2F40E347006C8DF7 /* time */,
-				475C9C282F410F6E006C8DF7 /* TimeWidget */,
 				475C9C232F410F6E006C8DF7 /* Frameworks */,
 				475C9C0D2F40E347006C8DF7 /* Products */,
 			);

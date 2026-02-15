@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct HistoryView: View {
@@ -26,20 +25,23 @@ struct HistoryView: View {
             List {
                 Section(header: Text("Abgeschlossene Tage")) {
                     ForEach(timeManager.completedDays) { day in
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 10) { // Added spacing
                             HStack {
                                 Text(day.date, formatter: dateFormatter)
-                                    .font(.headline)
+                                    .font(.subheadline) // Subtler font
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
                                 Spacer()
                                 Button("Edit") {
                                     self.dayToEdit = day
                                 }
-                                .padding(5)
-                                .background(Color.gray.opacity(0.2))
-                                .cornerRadius(5)
+                                .font(.caption) // Smaller font for edit button
+                                .foregroundColor(.accentColor) // Use accent color
+                                // Removed background and cornerRadius for minimalist look
                             }
                             
                             Divider()
+                                .padding(.vertical, 2)
                             
                             // Display total durations
                             HStack {
@@ -48,18 +50,23 @@ struct HistoryView: View {
                                 Text("Gesamtpause: \(timeFormatted(day.pauseDuration))")
                             }
                             .font(.subheadline)
+                            .foregroundColor(.secondary)
                             .padding(.bottom, 5)
                             
                             // Display individual segments
                             ForEach(day.segments) { segment in
                                 HStack {
                                     Image(systemName: segment.type == .work ? "briefcase.fill" : "pause.fill")
-                                        .foregroundColor(segment.type == .work ? .green : .orange)
+                                        .foregroundColor(segment.type == .work ? .accentColor : .orange.opacity(0.8)) // Use accent color
+                                        .font(.caption) // Smaller icon
                                     Text(segment.type == .work ? "Arbeit" : "Pause")
+                                        .font(.caption)
+                                        .foregroundColor(.primary)
                                     Spacer()
                                     Text("\(timeFormatter.string(from: segment.startTime)) - \(segment.endTime.map { timeFormatter.string(from: $0) } ?? "Aktiv")")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
-                                .font(.caption)
                             }
                         }
                         .padding(.vertical, 5)
@@ -67,12 +74,14 @@ struct HistoryView: View {
                     .onDelete(perform: deleteDay) // Add swipe to delete functionality
                 }
             }
+            .listStyle(PlainListStyle()) // Minimalist list style
             .navigationTitle("Verlauf")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Fertig") {
                         presentationMode.wrappedValue.dismiss()
                     }
+                    .foregroundColor(.accentColor) // Accent color for toolbar button
                 }
             }
         }
@@ -97,15 +106,15 @@ struct HistoryView: View {
 struct HistoryView_Previews: PreviewProvider {
     static var previews: some View {
         let timeManager = TimeManager()
-        timeManager.completedDays.append(CompletedDay(date: Date(), segments: [
-            TimeSegment(type: .work, startTime: Date().addingTimeInterval(-3*3600), endTime: Date().addingTimeInterval(-1*3600)),
-            TimeSegment(type: .pause, startTime: Date().addingTimeInterval(-1*3600), endTime: Date().addingTimeInterval(-0.5*3600)),
-            TimeSegment(type: .work, startTime: Date().addingTimeInterval(-0.5*3600), endTime: Date())
+        timeManager.completedDays.append(CompletedDay(id: UUID(), date: Date(), segments: [
+            TimeSegment(id: UUID(), type: .work, startTime: Date().addingTimeInterval(-3*3600), endTime: Date().addingTimeInterval(-1*3600)),
+            TimeSegment(id: UUID(), type: .pause, startTime: Date().addingTimeInterval(-1*3600), endTime: Date().addingTimeInterval(-0.5*3600)),
+            TimeSegment(id: UUID(), type: .work, startTime: Date().addingTimeInterval(-0.5*3600), endTime: Date())
         ]))
-        timeManager.completedDays.append(CompletedDay(date: Date().addingTimeInterval(-86400), segments: [
-            TimeSegment(type: .work, startTime: Date().addingTimeInterval(-8*3600), endTime: Date().addingTimeInterval(-5*3600)),
-            TimeSegment(type: .pause, startTime: Date().addingTimeInterval(-5*3600), endTime: Date().addingTimeInterval(-4.5*3600)),
-            TimeSegment(type: .work, startTime: Date().addingTimeInterval(-4.5*3600), endTime: Date().addingTimeInterval(-2*3600))
+        timeManager.completedDays.append(CompletedDay(id: UUID(), date: Date().addingTimeInterval(-86400), segments: [
+            TimeSegment(id: UUID(), type: .work, startTime: Date().addingTimeInterval(-8*3600), endTime: Date().addingTimeInterval(-5*3600)),
+            TimeSegment(id: UUID(), type: .pause, startTime: Date().addingTimeInterval(-5*3600), endTime: Date().addingTimeInterval(-4.5*3600)),
+            TimeSegment(id: UUID(), type: .work, startTime: Date().addingTimeInterval(-4.5*3600), endTime: Date().addingTimeInterval(-2*3600))
         ]))
         
         return HistoryView(timeManager: timeManager)

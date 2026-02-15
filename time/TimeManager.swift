@@ -4,34 +4,7 @@ import Combine
 import SwiftUI // Import SwiftUI for @AppStorage and ScenePhase
 import UserNotifications
 
-enum TimerState {
-    case idle
-    case working
-    case pausing
-}
 
-enum SegmentType: String, Codable {
-    case work
-    case pause
-}
-
-struct TimeSegment: Identifiable, Codable {
-    var id = UUID() // Changed to var for Codable decoding
-    var type: SegmentType
-    var startTime: Date
-    var endTime: Date? // nil if segment is currently active
-    var accelerationFactor: TimeInterval = 1 // Factor active when this segment started
-    
-    // Computed property for accelerated duration of the segment
-    var duration: TimeInterval {
-        (endTime ?? Date()).timeIntervalSince(startTime) * accelerationFactor
-    }
-    
-    // Computed property for real (unaccelerated) duration of the segment
-    var realDuration: TimeInterval {
-        (endTime ?? Date()).timeIntervalSince(startTime)
-    }
-}
 
 struct CompletedDay: Identifiable, Codable { // Make CompletedDay Codable
     var id = UUID() // Changed to var for Codable decoding
