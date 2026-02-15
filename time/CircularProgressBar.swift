@@ -22,13 +22,12 @@ struct CircularProgressBar: View {
             let lineWidth: CGFloat = 20
             let textRadius = radius + (lineWidth / 2) + 20 // Position text further outside the bar to prevent overlap
             
-            // Calculate initial rotation based on initialDisplayTime
+            // Calculate the angle corresponding to initialDisplayTime (0=12 o'clock, clockwise)
             let calendar = Calendar.current
             let hour = calendar.component(.hour, from: initialDisplayTime)
             let minute = calendar.component(.minute, from: initialDisplayTime)
-            // Total minutes from 00:00, then normalized to 12-hour cycle (0-11.99)
-            let normalizedTimeForRotation = Double(hour % 12) + (Double(minute) / 60.0)
-            let startRotationDegrees = normalizedTimeForRotation * 30.0 // 30 degrees per hour (360/12)
+            let normalizedTime = Double(hour % 12) + (Double(minute) / 60.0)
+            let initialTimeOffsetAngleFrom12Clock = Angle.degrees(normalizedTime * 30.0) // 30 degrees per hour (360/12)
             
             ZStack {
                 // Background circle
@@ -38,7 +37,7 @@ struct CircularProgressBar: View {
                 // Progress arcs
                 ForEach(Array(timeManager.currentSegments.enumerated()), id: \.offset) { index, segment in
                     // Calculate startAngle declaratively by summing angles of preceding segments
-                    let currentStartAngle = timeManager.currentSegments[0..<index].reduce(Angle.zero) { (currentTotalAngle, prevSegment) -> Angle in
+                    let currentAccumulatedAngle = timeManager.currentSegments[0..<index].reduce(Angle.zero) { (currentTotalAngle, prevSegment) -> Angle in
                         currentTotalAngle + Angle.degrees(prevSegment.duration / totalMaxSeconds * 360)
                     }
                     
@@ -46,11 +45,15 @@ struct CircularProgressBar: View {
                     let segmentAngle = Angle.degrees(segmentDuration / totalMaxSeconds * 360)
                     
                     Path { path in
+                        // Convert angles from 0=12 o'clock CW to 0=3 o'clock CCW for addArc
+                        let arcStartAngle = Angle.degrees(90) - (initialTimeOffsetAngleFrom12Clock + currentAccumulatedAngle)
+                        let arcEndAngle = Angle.degrees(90) - (initialTimeOffsetAngleFrom12Clock + currentAccumulatedAngle + segmentAngle)
+                        
                         path.addArc(center: center,
                                     radius: radius - (lineWidth / 2), // Adjust radius for line width
-                                    startAngle: currentStartAngle,
-                                    endAngle: currentStartAngle + segmentAngle,
-                                    clockwise: false) // Clockwise for standard progression
+                                    startAngle: arcStartAngle,
+                                    endAngle: arcEndAngle,
+                                    clockwise: false) // Always draw counter-clockwise
                     }
                     .stroke(segment.type == .work ? Color.green : Color.orange, lineWidth: lineWidth)
                 }
@@ -61,43 +64,49 @@ struct CircularProgressBar: View {
                     Text(timeFormatter.string(from: initialDisplayTime))
                         .font(.caption2)
                         .foregroundColor(.primary)
-                        .position(positionForAngle(angle: Angle.zero, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90 - startRotationDegrees)) // Counter-rotate relative to ZStack rotation
+                        .position(positionForAngle(angle: positionAngleFrom12Clock(initialTimeOffsetAngleFrom12Clock + Angle.zero), center: center, textRadius: textRadius))
+                        .rotationEffect(.degrees(0)) // No rotation needed for text if ZStack is not rotated
 
                     // 6-hour mark
                     let sixHourAngle = Angle.degrees((6 * 3600) / totalMaxSeconds * 360)
                     Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(6 * 3600)))
                         .font(.caption2)
                         .foregroundColor(.primary)
-                        .position(positionForAngle(angle: sixHourAngle, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90 - startRotationDegrees))
+                        .position(positionForAngle(angle: positionAngleFrom12Clock(initialTimeOffsetAngleFrom12Clock + sixHourAngle), center: center, textRadius: textRadius))
+                        .rotationEffect(.degrees(0))
 
                     // 8-hour mark
                     let eightHourAngle = Angle.degrees((8 * 3600) / totalMaxSeconds * 360)
                     Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(8 * 3600)))
                         .font(.caption2)
                         .foregroundColor(.primary)
-                        .position(positionForAngle(angle: eightHourAngle, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90 - startRotationDegrees))
+                        .position(positionForAngle(angle: positionAngleFrom12Clock(initialTimeOffsetAngleFrom12Clock + eightHourAngle), center: center, textRadius: textRadius))
+                        .rotationEffect(.degrees(0))
 
                     // 10-hour mark
                     let tenHourAngle = Angle.degrees((10 * 3600) / totalMaxSeconds * 360)
                     Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(10 * 3600)))
                         .font(.caption2)
                         .foregroundColor(.primary)
-                        .position(positionForAngle(angle: tenHourAngle, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90 - startRotationDegrees))
+                        .position(positionForAngle(angle: positionAngleFrom12Clock(initialTimeOffsetAngleFrom12Clock + tenHourAngle), center: center, textRadius: textRadius))
+                        .rotationEffect(.degrees(0))
                 }
             }
-            .rotationEffect(.degrees(-90 + startRotationDegrees)) // -90 for 12 o'clock start, then offset by actual time
+            // No rotation on ZStack, as arcs and text positions are now correctly calculated relative to 0=12 o'clock, CW
             .frame(width: geometry.size.width, height: geometry.size.height) // Ensure ZStack respects GeometryReader's frame
         }
-    }    
+    }
+    
     // Helper to position text for a given angle
     private func positionForAngle(angle: Angle, center: CGPoint, textRadius: CGFloat) -> CGPoint {
         let x = center.x + textRadius * cos(angle.radians)
         let y = center.y + textRadius * sin(angle.radians)
         return CGPoint(x: x, y: y)
+    }
+
+    // Helper to convert 0=12 o'clock CW to 0=3 o'clock CCW for positionForAngle
+    private func positionAngleFrom12Clock(_ angleFrom12Clock: Angle) -> Angle {
+        return Angle.degrees(90) - angleFrom12Clock
     }
 }
 
