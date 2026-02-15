@@ -20,7 +20,15 @@ struct CircularProgressBar: View {
             let radius = diameter / 2
             let center = CGPoint(x: diameter / 2, y: diameter / 2)
             let lineWidth: CGFloat = 20
-            let textRadius = radius + (lineWidth / 2) + 10 // Position text outside the bar
+            let textRadius = radius + (lineWidth / 2) + 20 // Position text further outside the bar to prevent overlap
+            
+            // Calculate initial rotation based on initialDisplayTime
+            let calendar = Calendar.current
+            let hour = calendar.component(.hour, from: initialDisplayTime)
+            let minute = calendar.component(.minute, from: initialDisplayTime)
+            // Total minutes from 00:00, then normalized to 12-hour cycle (0-11.99)
+            let normalizedTimeForRotation = Double(hour % 12) + (Double(minute) / 60.0)
+            let startRotationDegrees = normalizedTimeForRotation * 30.0 // 30 degrees per hour (360/12)
             
             ZStack {
                 // Background circle
@@ -54,7 +62,7 @@ struct CircularProgressBar: View {
                         .font(.caption2)
                         .foregroundColor(.primary)
                         .position(positionForAngle(angle: Angle.zero, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90)) // Counter-rotate so text is horizontal
+                        .rotationEffect(.degrees(90 - startRotationDegrees)) // Counter-rotate relative to ZStack rotation
 
                     // 6-hour mark
                     let sixHourAngle = Angle.degrees((6 * 3600) / totalMaxSeconds * 360)
@@ -62,7 +70,7 @@ struct CircularProgressBar: View {
                         .font(.caption2)
                         .foregroundColor(.primary)
                         .position(positionForAngle(angle: sixHourAngle, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90))
+                        .rotationEffect(.degrees(90 - startRotationDegrees))
 
                     // 8-hour mark
                     let eightHourAngle = Angle.degrees((8 * 3600) / totalMaxSeconds * 360)
@@ -70,7 +78,7 @@ struct CircularProgressBar: View {
                         .font(.caption2)
                         .foregroundColor(.primary)
                         .position(positionForAngle(angle: eightHourAngle, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90))
+                        .rotationEffect(.degrees(90 - startRotationDegrees))
 
                     // 10-hour mark
                     let tenHourAngle = Angle.degrees((10 * 3600) / totalMaxSeconds * 360)
@@ -78,14 +86,13 @@ struct CircularProgressBar: View {
                         .font(.caption2)
                         .foregroundColor(.primary)
                         .position(positionForAngle(angle: tenHourAngle, center: center, textRadius: textRadius))
-                        .rotationEffect(.degrees(90))
+                        .rotationEffect(.degrees(90 - startRotationDegrees))
                 }
             }
-            .rotationEffect(.degrees(-90)) // Start from the top (12 o'clock)
+            .rotationEffect(.degrees(-90 + startRotationDegrees)) // -90 for 12 o'clock start, then offset by actual time
             .frame(width: geometry.size.width, height: geometry.size.height) // Ensure ZStack respects GeometryReader's frame
         }
-    }
-    
+    }    
     // Helper to position text for a given angle
     private func positionForAngle(angle: Angle, center: CGPoint, textRadius: CGFloat) -> CGPoint {
         let x = center.x + textRadius * cos(angle.radians)
@@ -105,7 +112,7 @@ struct CircularProgressBar_Previews: PreviewProvider {
         
         return VStack {
             Text("Circular Progress Bar")
-            CircularProgressBar(timeManager: mockTimeManager, totalMaxSeconds: 10 * 3600,
+            CircularProgressBar(timeManager: mockTimeManager, totalMaxSeconds: 12 * 3600, // Updated to 12 hours
                                 initialDisplayTime: Date(),
                                 baseTimeForMilestones: Date().addingTimeInterval(-5 * 3600)) // Mock base time
                 .frame(width: 200, height: 200)
