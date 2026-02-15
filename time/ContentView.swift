@@ -44,12 +44,18 @@ struct ContentView: View {
                     .padding(.bottom, 10)
                 
                 if let quote = timeManager.currentQuote {
-                    Text(quote)
-                        .font(.caption)
-                        .italic()
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                        .padding(.bottom, 10)
+                    VStack { // Use VStack for the box effect
+                        Text(quote)
+                            .font(.title3) // Much larger font
+                            .italic()
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal) // Apply horizontal padding to the text inside the box
+                            .padding(.vertical, 15) // Increased vertical padding for the text
+                    }
+                    .background(.ultraThinMaterial) // No specific color, using a system material for transparency
+                    .cornerRadius(10) // Rounded corners for the box
+                    .padding(.horizontal) // Padding for the box itself from the edges of the screen
+                    .padding(.bottom, 10) // Retain original bottom padding
                 }
 
                 HStack(spacing: 20) {
