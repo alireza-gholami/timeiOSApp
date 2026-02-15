@@ -47,10 +47,8 @@ struct ContentView: View {
                             .font(.caption2)
                             .foregroundColor(.primary)
                             .frame(width: 40, alignment: .leading) // Align left
-                            .offset(x: -20) // Align left edge of text with left edge of bar
                         
                         // Spacer to 6-hour mark
-                        // The width of the spacer needs to consider the 40pt width of the Text element itself
                         Spacer(minLength: 0)
                             .frame(width: max(0, (CGFloat(6 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - 40))
 
@@ -72,16 +70,17 @@ struct ContentView: View {
                         
                         // Spacer to 10-hour mark
                         Spacer(minLength: 0)
-                            .frame(width: max(0, (CGFloat(totalMaxDuration) / CGFloat(totalMaxDuration) * geometry.size.width) - (CGFloat(8 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - 40)) // Remaining width to end, adjusted for end text
+                            .frame(width: max(0, (CGFloat(totalMaxDuration) / CGFloat(totalMaxDuration) * geometry.size.width) - (CGFloat(8 * 3600) / CGFloat(totalMaxDuration) * geometry.size.width) - 40))
 
                         // 10-hour mark
                         Text(timeFormatter.string(from: baseTimeForMilestones.addingTimeInterval(totalMaxDuration)))
                             .font(.caption2)
                             .foregroundColor(.primary)
                             .frame(width: 40, alignment: .trailing) // Align right
-                            .offset(x: 20) // Align right edge of text with right edge of bar
                     }
                     .frame(height: 20)
+                    .frame(maxWidth: .infinity, alignment: .leading) // Ensure HStack expands to full width
+                    .padding(.horizontal, -20) // Push entire HStack further to the edges
                 }
                 .padding(.horizontal)
                 
