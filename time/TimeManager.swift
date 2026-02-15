@@ -338,6 +338,19 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         }
     }
     
+    func updateSegment(forDayId dayId: UUID, segmentId: UUID, newStartTime: Date, newEndTime: Date?) {
+        if let dayIndex = completedDays.firstIndex(where: { $0.id == dayId }) {
+            if let segmentIndex = completedDays[dayIndex].segments.firstIndex(where: { $0.id == segmentId }) {
+                // Update the segment's start and end times
+                completedDays[dayIndex].segments[segmentIndex].startTime = newStartTime
+                completedDays[dayIndex].segments[segmentIndex].endTime = newEndTime
+                // Note: This simple update does not re-evaluate or shift subsequent segments.
+                // It also assumes the accelerationFactor remains the same.
+                // The duration property of the TimeSegment will automatically recalculate.
+            }
+        }
+    }
+    
     // MARK: - Export Logic
     func exportToCSV() -> String {
         let dateFormatter = DateFormatter()
