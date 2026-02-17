@@ -12,6 +12,7 @@ struct ContentView: View {
     @StateObject private var timeManager = TimeManager()
     @State private var showingHistory: Bool = false
     @State private var showingNotifications: Bool = false // New state for notifications
+    @State private var showingLogs: Bool = false // New state for logs
     @AppStorage("isDarkMode") private var isDarkMode = false
     @State private var initialDisplayTime: Date = Date() // Capture the initial display time
     @AppStorage("isCircularTimeBar") var isCircularTimeBar: Bool = false // State for toggling time bar style
@@ -194,6 +195,12 @@ struct ContentView: View {
                         }
                         
                         Button {
+                            showingLogs = true
+                        } label: {
+                            Label("Logs anzeigen", systemImage: "doc.text")
+                        }
+                        
+                        Button {
                             let csvString = timeManager.exportToCSV()
                             shareCSV(csvString: csvString)
                         } label: {
@@ -210,6 +217,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingNotifications) {
             NotificationsView(timeManager: timeManager)
+        }
+        .sheet(isPresented: $showingLogs) {
+            LogView()
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)
     }

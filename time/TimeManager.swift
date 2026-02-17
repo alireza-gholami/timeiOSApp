@@ -78,6 +78,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
 
     override init() {
         super.init()
+        LogManager.shared.log("TimeManager initialized.")
         UNUserNotificationCenter.current().delegate = self
         loadData() // Load data when TimeManager is initialized
         
@@ -86,6 +87,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
     
     @objc private func appMovedToBackground() {
+        LogManager.shared.log("App moved to background.")
         saveData()
     }
 
@@ -131,9 +133,9 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
-                print("Notification permission granted.")
+                LogManager.shared.log("Notification permission granted.")
             } else if let error = error {
-                print("Notification permission error: \(error.localizedDescription)")
+                LogManager.shared.log("Notification permission error: \(error.localizedDescription)")
             }
         }
     }
@@ -194,18 +196,26 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
 
     private func startTimer() {
         if currentTimer == nil {
+            LogManager.shared.log("Timer started.")
+            var lastSaveTime = Date()
             currentTimer = Timer.publish(every: 1, on: .main, in: .common)
                 .autoconnect()
-                .sink { [weak self] _ in
+                .sink { [weak self] currentTime in
                     guard let self = self else { return }
                     
                     self.objectWillChange.send() // Force UI update to recalculate computed properties
                     self.checkBreakRules() // Check rules every second work ticks
+
+                    if currentTime.timeIntervalSince(lastSaveTime) >= 10 {
+                        self.saveData()
+                        lastSaveTime = currentTime
+                    }
                 }
         }
     }
 
     private func stopTimer() {
+        LogManager.shared.log("Timer stopped.")
         currentTimer?.cancel()
         currentTimer = nil
     }
@@ -213,10 +223,12 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     private func endLastActiveSegment() {
         if let lastIndex = currentSegments.indices.last, currentSegments[lastIndex].endTime == nil {
             currentSegments[lastIndex].endTime = Date() // Set real end time
+            LogManager.shared.log("Ended last active segment.")
         }
     }
 
     func startWork() {
+        LogManager.shared.log("Starting work.")
         if timerState == .idle {
             currentQuote = funnyWorkQuotes.randomElement()
         }
@@ -228,6 +240,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func startPause() {
+        LogManager.shared.log("Starting pause.")
         endLastActiveSegment() // End active work segment
         currentSegments.append(TimeSegment(type: .pause, startTime: Date(), accelerationFactor: testModeFactor)) // Pass current testModeFactor
         timerState = .pausing
@@ -235,6 +248,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func resumeWork() {
+        LogManager.shared.log("Resuming work.")
         endLastActiveSegment() // End active pause segment
         currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: testModeFactor)) // Pass current testModeFactor
         timerState = .working
@@ -242,6 +256,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func finishDay() {
+        LogManager.shared.log("Finishing day.")
         endLastActiveSegment() // End any active segment
 
         let dayRecord = CompletedDay(id: UUID(), date: Date(), segments: currentSegments)
@@ -251,6 +266,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func reset() {
+        LogManager.shared.log("Resetting TimeManager.")
         stopTimer()
         currentSegments = []
         timerState = .idle
@@ -267,6 +283,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     private let testModeActiveKey = "testModeActive"
 
     func saveData() {
+        LogManager.shared.log("Saving data.")
         do {
             let encodedCompletedDays = try JSONEncoder().encode(completedDays)
             UserDefaults.standard.set(encodedCompletedDays, forKey: completedDaysKey)
@@ -275,23 +292,27 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
             UserDefaults.standard.set(encodedCurrentSegments, forKey: currentSegmentsKey)
             
             UserDefaults.standard.set(testModeActive, forKey: testModeActiveKey)
+            LogManager.shared.log("Data saved successfully.")
         } catch {
-            print("Failed to save data: \(error)")
+            LogManager.shared.log("Failed to save data: \(error)")
         }
     }
 
     func loadData() {
+        LogManager.shared.log("Loading data.")
         if let savedCompletedDays = UserDefaults.standard.data(forKey: completedDaysKey) {
             do {
                 completedDays = try JSONDecoder().decode([CompletedDay].self, from: savedCompletedDays)
+                LogManager.shared.log("Completed days loaded successfully.")
             } catch {
-                print("Failed to load completed days: \(error)")
+                LogManager.shared.log("Failed to load completed days: \(error)")
             }
         }
         
         if let savedCurrentSegments = UserDefaults.standard.data(forKey: currentSegmentsKey) {
             do {
                 currentSegments = try JSONDecoder().decode([TimeSegment].self, from: savedCurrentSegments)
+                LogManager.shared.log("Current segments loaded successfully.")
                 // If currentSegments are loaded and timerState was working/pausing, resume timer
                 if !currentSegments.isEmpty && currentSegments.last?.endTime == nil {
                     // Re-evaluate timerState based on the last segment type
@@ -300,10 +321,11 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
                     } else if currentSegments.last?.type == .pause {
                         timerState = .pausing
                     }
+                    LogManager.shared.log("Resuming timer for active session.")
                     startTimer()
                 }
             } catch {
-                print("Failed to load current segments: \(error)")
+                LogManager.shared.log("Failed to load current segments: \(error)")
             }
         }
         
