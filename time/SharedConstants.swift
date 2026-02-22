@@ -13,7 +13,7 @@ extension Color {
 }
 
 struct AppGroup {
-    static let identifier = "group.com.alireza.time" // Replace with your actual App Group Identifier
+    static let identifier = "group.com.alireza.Widget" // Match the entitlements
 }
 
 // MARK: - Shared Data Structures

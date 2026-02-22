@@ -27,7 +27,7 @@ struct Provider: TimelineProvider {
     
     private func loadEntry(for date: Date) -> SimpleEntry {
         // Swift 6 fix: hardcode or use safe access
-        let groupID = "group.com.alireza.time"
+        let groupID = "group.com.alireza.Widget"
         let sharedDefaults = UserDefaults(suiteName: groupID)
         
         var currentSegments: [TimeSegment] = []

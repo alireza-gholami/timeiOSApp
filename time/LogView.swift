@@ -22,6 +22,11 @@ struct LogView: View {
                 }
                 .padding()
 
+                Button("Teilen") {
+                    shareLog()
+                }
+                .padding()
+
                 Button("Clear") {
                     LogManager.shared.clearLog()
                     logText = ""
@@ -31,6 +36,30 @@ struct LogView: View {
         }
         .onAppear {
             logText = LogManager.shared.readLog()
+        }
+    }
+    
+    private func shareLog() {
+        let logContent = LogManager.shared.readLog()
+        let fileName = "app_log.txt"
+        let path = NSURL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
+        
+        do {
+            try logContent.write(to: path!, atomically: true, encoding: .utf8)
+        } catch {
+            print("Failed to create log file for sharing")
+            return
+        }
+        
+        let activityViewController = UIActivityViewController(activityItems: [path!], applicationActivities: nil)
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = windowScene.windows.first?.rootViewController {
+            var topController = root
+            while let presented = topController.presentedViewController {
+                topController = presented
+            }
+            topController.present(activityViewController, animated: true, completion: nil)
         }
     }
 }
