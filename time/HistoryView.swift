@@ -24,7 +24,7 @@ struct HistoryView: View {
         NavigationView {
             List {
                 Section(header: Text("Abgeschlossene Tage")) {
-                    ForEach(timeManager.completedDays) { day in
+                    ForEach(timeManager.completedDays.reversed()) { day in
                         VStack(alignment: .leading, spacing: 10) { // Added spacing
                             HStack {
                                 Text(day.date, formatter: dateFormatter)
@@ -99,7 +99,14 @@ struct HistoryView: View {
     }
     
     private func deleteDay(at offsets: IndexSet) {
-        timeManager.completedDays.remove(atOffsets: offsets)
+        // Map the offsets from the reversed list back to the original list IDs
+        let reversedDays = timeManager.completedDays.reversed()
+        for index in offsets {
+            let dayToDelete = reversedDays[reversedDays.index(reversedDays.startIndex, offsetBy: index)]
+            if let originalIndex = timeManager.completedDays.firstIndex(where: { $0.id == dayToDelete.id }) {
+                timeManager.completedDays.remove(at: originalIndex)
+            }
+        }
     }
 }
 
