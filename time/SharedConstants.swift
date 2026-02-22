@@ -6,6 +6,11 @@
 //
 
 import Foundation
+import SwiftUI
+
+extension Color {
+    static let persianGreen = Color(red: 0/255, green: 166/255, blue: 147/255)
+}
 
 struct AppGroup {
     static let identifier = "group.com.alireza.time" // Replace with your actual App Group Identifier
@@ -37,5 +42,19 @@ public struct TimeSegment: Identifiable, Codable {
     
     public var realDuration: TimeInterval {
         (endTime ?? Date()).timeIntervalSince(startTime)
+    }
+}
+
+public struct CompletedDay: Identifiable, Codable {
+    public var id = UUID()
+    public var date: Date
+    public var segments: [TimeSegment]
+    
+    public var workDuration: TimeInterval {
+        segments.filter { $0.type == .work }.reduce(0) { $0 + $1.duration }
+    }
+    
+    public var pauseDuration: TimeInterval {
+        segments.filter { $0.type == .pause }.reduce(0) { $0 + $1.duration }
     }
 }

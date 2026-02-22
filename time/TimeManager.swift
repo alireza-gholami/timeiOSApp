@@ -1,30 +1,9 @@
-
 import Foundation
 import Combine
 import SwiftUI // Import SwiftUI for @AppStorage and ScenePhase
+import UIKit // For background task
 import UserNotifications
-
-
-
-struct CompletedDay: Identifiable, Codable { // Make CompletedDay Codable
-    var id = UUID() // Changed to var for Codable decoding
-    var date: Date // Date when the day was finished
-    var segments: [TimeSegment]
-    
-    // Computed total accelerated work duration for a completed day
-    var workDuration: TimeInterval {
-        segments.filter { $0.type == .work }.reduce(0) { total, segment in
-            total + segment.duration
-        }
-    }
-    
-    // Computed total accelerated pause duration for a completed day
-    var pauseDuration: TimeInterval {
-        segments.filter { $0.type == .pause }.reduce(0) { total, segment in
-            total + segment.duration
-        }
-    }
-}
+import WidgetKit // Import WidgetKit to reload the timeline
 
 class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     @Published var currentSegments: [TimeSegment] = [] {
@@ -70,6 +49,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     ]
 
     private var currentTimer: AnyCancellable?
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     
     // Flags to prevent spamming notifications
     private var sent6HourWarning = false
@@ -84,11 +64,38 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         
         // Observe scenePhase changes to save data when app goes to background
         NotificationCenter.default.addObserver(self, selector: #selector(appMovedToBackground), name: UIScene.willDeactivateNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appMovedToForeground), name: UIScene.willEnterForegroundNotification, object: nil)
     }
     
     @objc private func appMovedToBackground() {
-        LogManager.shared.log("App moved to background.")
+        LogManager.shared.log("App moved to background, starting background task.")
+        
+        backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
+            // End the task if time runs out.
+            self?.endBackgroundTask()
+        }
+        
         saveData()
+        
+        // End the background task shortly after saving.
+        // Give it a couple of seconds to make sure the save is complete.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.endBackgroundTask()
+        }
+    }
+    
+    @objc private func appMovedToForeground() {
+        LogManager.shared.log("App moved to foreground.")
+        loadData() // Reload data to sync with Widget changes
+        endBackgroundTask()
+    }
+    
+    func endBackgroundTask() {
+        if backgroundTask != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTask)
+            backgroundTask = .invalid
+            LogManager.shared.log("Ended background task.")
+        }
     }
 
     // Delegate method to handle foreground notifications
@@ -283,53 +290,76 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     private let testModeActiveKey = "testModeActive"
 
     func saveData() {
-        LogManager.shared.log("Saving data.")
-        do {
-            let encodedCompletedDays = try JSONEncoder().encode(completedDays)
-            UserDefaults.standard.set(encodedCompletedDays, forKey: completedDaysKey)
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self = self else { return }
+            LogManager.shared.log("Saving data to AppGroup.")
+            do {
+                guard let sharedDefaults = UserDefaults(suiteName: AppGroup.identifier) else { return }
+                
+                let encodedCompletedDays = try JSONEncoder().encode(self.completedDays)
+                sharedDefaults.set(encodedCompletedDays, forKey: "completedDays")
 
-            let encodedCurrentSegments = try JSONEncoder().encode(currentSegments)
-            UserDefaults.standard.set(encodedCurrentSegments, forKey: currentSegmentsKey)
-            
-            UserDefaults.standard.set(testModeActive, forKey: testModeActiveKey)
-            LogManager.shared.log("Data saved successfully.")
-        } catch {
-            LogManager.shared.log("Failed to save data: \(error)")
+                let encodedCurrentSegments = try JSONEncoder().encode(self.currentSegments)
+                sharedDefaults.set(encodedCurrentSegments, forKey: "currentSegments")
+                
+                sharedDefaults.set(self.testModeActive, forKey: "testModeActive")
+                sharedDefaults.set(self.timerState.rawValue, forKey: "timerState")
+                
+                LogManager.shared.log("Data saved successfully to AppGroup. Total completed days: \(self.completedDays.count)")
+                
+                WidgetCenter.shared.reloadAllTimelines()
+            } catch {
+                LogManager.shared.log("Failed to save data to AppGroup: \(error)")
+            }
         }
     }
 
     func loadData() {
-        LogManager.shared.log("Loading data.")
-        if let savedCompletedDays = UserDefaults.standard.data(forKey: completedDaysKey) {
-            do {
-                completedDays = try JSONDecoder().decode([CompletedDay].self, from: savedCompletedDays)
-                LogManager.shared.log("Completed days loaded successfully.")
-            } catch {
-                LogManager.shared.log("Failed to load completed days: \(error)")
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self = self else { return }
+            LogManager.shared.log("Loading data from AppGroup.")
+            
+            guard let sharedDefaults = UserDefaults(suiteName: AppGroup.identifier) else {
+                LogManager.shared.log("Failed to access AppGroup defaults.")
+                return
             }
-        }
-        
-        if let savedCurrentSegments = UserDefaults.standard.data(forKey: currentSegmentsKey) {
-            do {
-                currentSegments = try JSONDecoder().decode([TimeSegment].self, from: savedCurrentSegments)
-                LogManager.shared.log("Current segments loaded successfully.")
-                // If currentSegments are loaded and timerState was working/pausing, resume timer
-                if !currentSegments.isEmpty && currentSegments.last?.endTime == nil {
-                    // Re-evaluate timerState based on the last segment type
-                    if currentSegments.last?.type == .work {
-                        timerState = .working
-                    } else if currentSegments.last?.type == .pause {
-                        timerState = .pausing
+
+            if let savedCompletedDays = sharedDefaults.data(forKey: "completedDays") {
+                do {
+                    let decodedCompletedDays = try JSONDecoder().decode([CompletedDay].self, from: savedCompletedDays)
+                    DispatchQueue.main.async {
+                        self.completedDays = decodedCompletedDays
+                        LogManager.shared.log("Completed days loaded from AppGroup: \(decodedCompletedDays.count)")
                     }
-                    LogManager.shared.log("Resuming timer for active session.")
-                    startTimer()
+                } catch {
+                    LogManager.shared.log("Failed to load completed days from AppGroup: \(error)")
                 }
-            } catch {
-                LogManager.shared.log("Failed to load current segments: \(error)")
+            }
+            
+            if let savedCurrentSegments = sharedDefaults.data(forKey: "currentSegments") {
+                do {
+                    let decodedCurrentSegments = try JSONDecoder().decode([TimeSegment].self, from: savedCurrentSegments)
+                    DispatchQueue.main.async {
+                        self.currentSegments = decodedCurrentSegments
+                        LogManager.shared.log("Current segments loaded from AppGroup.")
+                        
+                        // Check state from AppGroup instead of recalculating (more reliable with Widget)
+                        let stateString = sharedDefaults.string(forKey: "timerState") ?? "idle"
+                        self.timerState = TimerState(rawValue: stateString) ?? .idle
+                        
+                        if !self.currentSegments.isEmpty && self.currentSegments.last?.endTime == nil {
+                            self.startTimer()
+                        }
+                    }
+                } catch {
+                    LogManager.shared.log("Failed to load current segments from AppGroup: \(error)")
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.testModeActive = sharedDefaults.bool(forKey: "testModeActive")
             }
         }
-        
-        testModeActive = UserDefaults.standard.bool(forKey: testModeActiveKey)
     }
 
     func updateDay(id: UUID, workMinutes: Double, pauseMinutes: Double) {
@@ -342,13 +372,13 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
 
             if workMinutes > 0 {
                 // Approximate start/end for work segment with accelerated duration
-                let workRealDuration = workMinutes * 60 / editingAccelerationFactor
+                let workRealDuration = (workMinutes * 60) / editingAccelerationFactor
                 let workSegment = TimeSegment(type: .work, startTime: now.addingTimeInterval(-workRealDuration), endTime: now, accelerationFactor: editingAccelerationFactor)
                 updatedSegments.append(workSegment)
             }
             // If both are present, pause is assumed to be before work for simplicity
             if pauseMinutes > 0 {
-                let pauseRealDuration = pauseMinutes * 60 / editingAccelerationFactor
+                let pauseRealDuration = (pauseMinutes * 60) / editingAccelerationFactor
                 let pauseEndTime = updatedSegments.first?.startTime ?? now // End of pause is start of work, or now if no work
                 let pauseStartTime = pauseEndTime.addingTimeInterval(-pauseRealDuration)
                 let pauseSegment = TimeSegment(type: .pause, startTime: pauseStartTime, endTime: pauseEndTime, accelerationFactor: editingAccelerationFactor)
@@ -378,7 +408,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         
-        var csvString = "Date,Type,Start Time (Real),End Time (Real),Real Duration (seconds),Accelerated Duration (seconds),Accelerated Duration (HH:MM:SS)\n"
+        var lines = ["Date,Type,Start Time (Real),End Time (Real),Real Duration (seconds),Accelerated Duration (seconds),Accelerated Duration (HH:MM:SS)"]
         
         for day in completedDays {
             let dayDateString = dateFormatter.string(from: day.date).split(separator: " ").first!
@@ -386,17 +416,18 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
             for segment in day.segments {
                 let segmentType = segment.type.rawValue.capitalized
                 let startTimeString = dateFormatter.string(from: segment.startTime)
-                let endTimeString = segment.endTime.map { dateFormatter.string(from: $0) } ?? "" // Active segment in CSV shouldn't have real end time.
+                let endTimeString = segment.endTime.map { dateFormatter.string(from: $0) } ?? ""
                 
-                let realDurationSeconds = segment.realDuration
-                let acceleratedDurationSeconds = segment.duration
+                let realDurationSeconds = String(format: "%.0f", segment.realDuration)
+                let acceleratedDurationSeconds = String(format: "%.0f", segment.duration)
                 
-                let durationFormatted = timeFormatted(acceleratedDurationSeconds) // Use helper for HH:MM:SS
+                let durationFormatted = timeFormatted(segment.duration)
                 
-                csvString += "\(dayDateString),\(segmentType),\(startTimeString),\(endTimeString),\(String(format: "%.0f", realDurationSeconds)),\(String(format: "%.0f", acceleratedDurationSeconds)),\(durationFormatted)\n"
+                let line = "\(dayDateString),\(segmentType),\(startTimeString),\(endTimeString),\(realDurationSeconds),\(acceleratedDurationSeconds),\(durationFormatted)"
+                lines.append(line)
             }
         }
-        return csvString
+        return lines.joined(separator: "\n")
     }
     
     // Helper function for time formatting, similar to ContentView's

@@ -35,6 +35,8 @@ struct LogView: View {
     }
 }
 
-#Preview {
-    LogView()
+struct LogView_Previews: PreviewProvider {
+    static var previews: some View {
+        LogView()
+    }
 }
