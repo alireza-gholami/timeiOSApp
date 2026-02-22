@@ -30,6 +30,9 @@ struct ToggleTimerIntent: AppIntent {
             completedDays = (try? JSONDecoder().decode([CompletedDay].self, from: data)) ?? []
         }
         
+        let testModeActive = sharedDefaults?.bool(forKey: "testModeActive") ?? false
+        let factor: Double = testModeActive ? 300.0 : 1.0
+        
         // Aktuelles Segment beenden, falls vorhanden
         if let lastIndex = currentSegments.indices.last, currentSegments[lastIndex].endTime == nil {
             currentSegments[lastIndex].endTime = Date()
@@ -38,10 +41,10 @@ struct ToggleTimerIntent: AppIntent {
         // Neue Aktion ausführen
         switch action {
         case "work", "resume":
-            currentSegments.append(TimeSegment(type: .work, startTime: Date()))
+            currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: factor))
             sharedDefaults?.set(TimerState.working.rawValue, forKey: "timerState")
         case "pause":
-            currentSegments.append(TimeSegment(type: .pause, startTime: Date()))
+            currentSegments.append(TimeSegment(type: .pause, startTime: Date(), accelerationFactor: factor))
             sharedDefaults?.set(TimerState.pausing.rawValue, forKey: "timerState")
         case "stop":
             if !currentSegments.isEmpty {
