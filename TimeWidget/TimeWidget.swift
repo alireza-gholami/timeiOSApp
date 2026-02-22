@@ -26,7 +26,9 @@ struct Provider: TimelineProvider {
     }
     
     private func loadEntry(for date: Date) -> SimpleEntry {
-        let sharedDefaults = UserDefaults(suiteName: AppGroup.identifier)
+        // Swift 6 fix: hardcode or use safe access
+        let groupID = "group.com.alireza.time"
+        let sharedDefaults = UserDefaults(suiteName: groupID)
         
         var currentSegments: [TimeSegment] = []
         if let data = sharedDefaults?.data(forKey: "currentSegments") {
@@ -36,7 +38,6 @@ struct Provider: TimelineProvider {
         let stateString = sharedDefaults?.string(forKey: "timerState") ?? "idle"
         let timerState = TimerState(rawValue: stateString) ?? .idle
         
-        // Berechne die abgeschlossene Arbeit und Pause (ohne das aktuell laufende Segment)
         let completedWork = currentSegments.filter { $0.type == .work && $0.endTime != nil }
             .reduce(0) { $0 + $1.duration }
         let completedPause = currentSegments.filter { $0.type == .pause && $0.endTime != nil }
@@ -46,10 +47,8 @@ struct Provider: TimelineProvider {
         
         if let last = currentSegments.last, last.endTime == nil {
             if last.type == .work && timerState == .working {
-                // Wenn gearbeitet wird: Startzeitpunkt für Arbeits-Timer berechnen
                 activeStartTime = last.startTime.addingTimeInterval(-completedWork)
             } else if last.type == .pause && timerState == .pausing {
-                // Wenn Pause gemacht wird: Startzeitpunkt für Pausen-Timer berechnen
                 activeStartTime = last.startTime.addingTimeInterval(-completedPause)
             }
         }
@@ -74,7 +73,7 @@ struct TimeWidgetEntryView : View {
     var entry: Provider.Entry
 
     var body: some View {
-        VStack(alignment: .center, spacing: 6) {
+        VStack(alignment: .center, spacing: 4) {
             // Status Anzeige
             HStack(spacing: 4) {
                 Image(systemName: iconName)
@@ -88,25 +87,25 @@ struct TimeWidgetEntryView : View {
             VStack(spacing: 0) {
                 if let startTime = entry.activeSegmentStartTime, entry.timerState != .idle {
                     Text(startTime, style: .timer)
-                        .font(.system(size: 26, weight: .bold, design: .monospaced))
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
                         .multilineTextAlignment(.center)
                 } else {
                     Text(timeFormatted(entry.timerState == .pausing ? entry.pauseSeconds : entry.workSeconds))
-                        .font(.system(size: 26, weight: .bold, design: .monospaced))
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
                 }
-                
-                // Kleine Info, was gerade angezeigt wird
-                Text(entry.timerState == .pausing ? "Pausezeit" : "Arbeitszeit")
-                    .font(.system(size: 8))
-                    .foregroundColor(.secondary)
             }
+            
+            // Kleine Timebar im Widget
+            ProgressView(value: min(entry.workSeconds, 8 * 3600), total: 8 * 3600)
+                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                .scaleEffect(x: 1, y: 0.5, anchor: .center)
+                .padding(.horizontal, 10)
             
             Spacer(minLength: 0)
             
             // Drei Buttons: Arbeit, Pause, Ende
             if #available(iOS 17.0, *) {
                 HStack(spacing: 4) {
-                    // Arbeit Button (Start/Weiter)
                     Button(intent: ToggleTimerIntent(action: entry.timerState == .idle ? "work" : "resume")) {
                         VStack(spacing: 1) {
                             Image(systemName: "play.fill")
@@ -118,7 +117,6 @@ struct TimeWidgetEntryView : View {
                     .tint(.blue)
                     .disabled(entry.timerState == .working)
 
-                    // Pause Button
                     Button(intent: ToggleTimerIntent(action: "pause")) {
                         VStack(spacing: 1) {
                             Image(systemName: "pause.fill")
@@ -130,7 +128,6 @@ struct TimeWidgetEntryView : View {
                     .tint(.orange)
                     .disabled(entry.timerState == .pausing || entry.timerState == .idle)
 
-                    // Ende Button
                     Button(intent: ToggleTimerIntent(action: "stop")) {
                         VStack(spacing: 1) {
                             Image(systemName: "stop.fill")
@@ -142,7 +139,7 @@ struct TimeWidgetEntryView : View {
                     .tint(.red)
                     .disabled(entry.timerState == .idle)
                 }
-                .frame(height: 34)
+                .frame(height: 32)
                 .padding(.bottom, 4)
             }
         }
@@ -150,9 +147,9 @@ struct TimeWidgetEntryView : View {
     
     private var statusText: String {
         switch entry.timerState {
-        case .working: return "ARBEIT LÄUFT"
-        case .pausing: return "IN PAUSE"
-        case .idle: return "FEIERABEND"
+        case .working: return "ARBEIT"
+        case .pausing: return "PAUSE"
+        case .idle: return "FREI"
         }
     }
     
@@ -194,7 +191,7 @@ struct TimeWidget: Widget {
                     .background()
             }
         }
-        .configurationDisplayName("Arbeitszeit & Pause")
+        .configurationDisplayName("Arbeitszeit")
         .description("Steuere Arbeit und Pause direkt vom Homescreen.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

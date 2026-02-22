@@ -33,12 +33,7 @@ struct ContentView: View {
                     .bold()
                     .foregroundStyle(.blue)
                 
-                // Slim Time Bar (Always visible)
-                TimeProgressBar(timeManager: timeManager)
-                    .padding(.horizontal)
-                    .frame(height: 30)
-
-                // Time Bar Display (Optional View selection)
+                // Time Bar Display
                 Group { // Use Group to conditionally render different views
                     if isCircularTimeBar {
                         CircularProgressBar(timeManager: timeManager, totalMaxSeconds: 12 * 3600, // Now 12 hours for circular view

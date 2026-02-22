@@ -1,41 +1,44 @@
+
 import SwiftUI
 
 struct TimeProgressBar: View {
     @ObservedObject var timeManager: TimeManager
-    var totalMaxSeconds: TimeInterval = 10 * 3600 // 10 Stunden Standard
+    var totalMaxSeconds: TimeInterval // e.g., 10 hours * 3600 seconds/hour
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Hintergrund (Heller Grau)
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 12)
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background bar for total max time
+                Rectangle()
+                    .fill(Color.persianGreen.opacity(0.8))
+                    .frame(width: geometry.size.width)
 
-                    ForEach(Array(timeManager.currentSegments.enumerated()), id: \.offset) { index, segment in
-                        let segmentWidth = CGFloat(segment.duration / totalMaxSeconds) * geometry.size.width
-                        
-                        let xOffset = timeManager.currentSegments[0..<index].reduce(0.0) { (currentTotalOffset, prevSegment) -> CGFloat in
-                            currentTotalOffset + CGFloat(prevSegment.duration / totalMaxSeconds) * geometry.size.width
-                        }
-
-                        // Segment Balken
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(segment.type == .work ? Color.blue : Color.orange)
-                            .frame(width: max(0, min(segmentWidth, geometry.size.width - xOffset)), height: 12)
-                            .offset(x: xOffset)
-                            .shadow(color: segment.type == .work ? .blue.opacity(0.3) : .orange.opacity(0.3), radius: 2)
-                    }
+                ForEach(Array(timeManager.currentSegments.enumerated()), id: \.offset) { index, segment in
+                    let segmentWidth = CGFloat(segment.duration / totalMaxSeconds) * geometry.size.width
                     
-                    // Markierung für 8 Stunden (Ziel)
+                    // Calculate xOffset declaratively by summing durations of preceding segments
+                    let xOffset = timeManager.currentSegments[0..<index].reduce(0.0) { (currentTotalOffset, prevSegment) -> CGFloat in
+                        currentTotalOffset + CGFloat(prevSegment.duration / totalMaxSeconds) * geometry.size.width
+                    }
+
+                    // Segment bar
                     Rectangle()
-                        .fill(Color.red.opacity(0.5))
-                        .frame(width: 2, height: 18)
-                        .offset(x: CGFloat(8 * 3600 / totalMaxSeconds) * geometry.size.width)
+                        .fill(segment.type == .work ? Color.green : Color.orange)
+                        .frame(width: min(segmentWidth, geometry.size.width - xOffset))
+                        .offset(x: xOffset)
+                    
+                    // Time label for segment start
+                    Text(segment.startTime, style: .time)
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                        .rotationEffect(.degrees(90), anchor: .bottomLeading) // Rotate vertically, anchor at bottom-leading for better alignment
+                        .offset(x: xOffset - 5, y: -30) // Position at segment start, moved 5 points further left, and up above the bar
+                        .frame(width: 40) // Slightly wider frame for the rotated text
                 }
             }
-            .frame(height: 18)
+            .frame(height: 80) // Fixed height for the bar
+            .cornerRadius(0) // Ensure corners are square
         }
+        .frame(height: 20) // Ensure the GeometryReader takes up space
     }
 }

@@ -16,7 +16,9 @@ struct ToggleTimerIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        let sharedDefaults = UserDefaults(suiteName: AppGroup.identifier)
+        // Fix for Swift 6 Actor isolation: Accessing identifier from AppGroup
+        let groupID = "group.com.alireza.time" 
+        let sharedDefaults = UserDefaults(suiteName: groupID)
         
         var currentSegments: [TimeSegment] = []
         if let data = sharedDefaults?.data(forKey: "currentSegments") {
