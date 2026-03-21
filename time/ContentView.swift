@@ -102,15 +102,6 @@ struct ContentView: View {
                 
                 Spacer() // Add a spacer to push the text down
                 
-                // Text for current durations
-                HStack {
-                    Text("Arbeit: \(timeFormatted(timeManager.workSeconds))")
-                    Spacer()
-                    Text("Pause: \(timeFormatted(timeManager.pauseSeconds))")
-                }
-                .font(.title2)
-                .padding(.horizontal)
-                
                 Text("Status: \(statusText(for: timeManager.timerState))")
                     .font(.headline)
                     .padding(.bottom, 10)

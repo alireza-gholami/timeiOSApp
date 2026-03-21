@@ -11,7 +11,7 @@ import AppIntents
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), timerState: .idle, workSeconds: 0, pauseSeconds: 0, activeSegmentStartTime: nil)
+        SimpleEntry(date: Date(), timerState: .idle, workSeconds: 0, pauseSeconds: 0, activeSegmentStartTime: nil, testModeActive: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
@@ -30,6 +30,8 @@ struct Provider: TimelineProvider {
         let groupID = "group.com.alireza.Widget"
         let sharedDefaults = UserDefaults(suiteName: groupID)
         
+        let testModeActive = sharedDefaults?.bool(forKey: "testModeActive") ?? false
+        
         var currentSegments: [TimeSegment] = []
         if let data = sharedDefaults?.data(forKey: "currentSegments") {
             currentSegments = (try? JSONDecoder().decode([TimeSegment].self, from: data)) ?? []
@@ -38,26 +40,36 @@ struct Provider: TimelineProvider {
         let stateString = sharedDefaults?.string(forKey: "timerState") ?? "idle"
         let timerState = TimerState(rawValue: stateString) ?? .idle
         
-        let completedWork = currentSegments.filter { $0.type == .work && $0.endTime != nil }
+        let lastSummaryWork = sharedDefaults?.double(forKey: "lastSummaryWork") ?? 0
+        let lastSummaryPause = sharedDefaults?.double(forKey: "lastSummaryPause") ?? 0
+        
+        var totalWork = currentSegments.filter { $0.type == .work }
             .reduce(0) { $0 + $1.duration }
-        let completedPause = currentSegments.filter { $0.type == .pause && $0.endTime != nil }
+        var totalPause = currentSegments.filter { $0.type == .pause }
             .reduce(0) { $0 + $1.duration }
+        
+        // Wenn Idle und Zusammenfassung vorhanden, diese nutzen
+        if timerState == .idle && lastSummaryWork > 0 {
+            totalWork = lastSummaryWork
+            totalPause = lastSummaryPause
+        }
         
         var activeStartTime: Date? = nil
         
         if let last = currentSegments.last, last.endTime == nil {
             if last.type == .work && timerState == .working {
-                activeStartTime = last.startTime.addingTimeInterval(-completedWork)
+                activeStartTime = last.startTime.addingTimeInterval(-totalWork + last.duration)
             } else if last.type == .pause && timerState == .pausing {
-                activeStartTime = last.startTime.addingTimeInterval(-completedPause)
+                activeStartTime = last.startTime.addingTimeInterval(-totalPause + last.duration)
             }
         }
         
         return SimpleEntry(date: date, 
                           timerState: timerState, 
-                          workSeconds: completedWork, 
-                          pauseSeconds: completedPause,
-                          activeSegmentStartTime: activeStartTime)
+                          workSeconds: totalWork, 
+                          pauseSeconds: totalPause,
+                          activeSegmentStartTime: activeStartTime,
+                          testModeActive: testModeActive)
     }
 }
 
@@ -67,6 +79,7 @@ struct SimpleEntry: TimelineEntry {
     let workSeconds: TimeInterval
     let pauseSeconds: TimeInterval
     let activeSegmentStartTime: Date?
+    let testModeActive: Bool
 }
 
 struct TimeWidgetEntryView : View {
@@ -78,6 +91,17 @@ struct TimeWidgetEntryView : View {
             HStack(spacing: 4) {
                 Image(systemName: iconName)
                 Text(statusText)
+                
+                if #available(iOS 17.0, *) {
+                    Button(intent: ToggleTimerIntent(action: "toggleTestMode")) {
+                        Image(systemName: entry.testModeActive ? "bolt.fill" : "bolt")
+                            .foregroundColor(entry.testModeActive ? .yellow : .gray)
+                    }
+                    .buttonStyle(.plain)
+                } else if entry.testModeActive {
+                    Image(systemName: "bolt.fill")
+                        .foregroundColor(.yellow)
+                }
             }
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(statusColor)
@@ -95,11 +119,23 @@ struct TimeWidgetEntryView : View {
                 }
             }
             
-            // Kleine Timebar im Widget
-            ProgressView(value: min(entry.workSeconds, 8 * 3600), total: 8 * 3600)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                .scaleEffect(x: 1, y: 0.5, anchor: .center)
-                .padding(.horizontal, 10)
+            // Zusammenfassung im Widget
+            HStack {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Arbeit").font(.system(size: 8, weight: .bold))
+                    Text(timeFormattedShort(entry.workSeconds)).font(.system(size: 10, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(.blue)
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("Pause").font(.system(size: 8, weight: .bold))
+                    Text(timeFormattedShort(entry.pauseSeconds)).font(.system(size: 10, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(.orange)
+            }
+            .padding(.horizontal, 12)
             
             Spacer(minLength: 0)
             
@@ -174,6 +210,12 @@ struct TimeWidgetEntryView : View {
         let minutes: Int = Int((totalSeconds / 60).truncatingRemainder(dividingBy: 60))
         let seconds: Int = Int(totalSeconds.truncatingRemainder(dividingBy: 60))
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private func timeFormattedShort(_ totalSeconds: TimeInterval) -> String {
+        let hours: Int = Int(totalSeconds / 3600)
+        let minutes: Int = Int((totalSeconds / 60).truncatingRemainder(dividingBy: 60))
+        return String(format: "%02dh %02dm", hours, minutes)
     }
 }
 

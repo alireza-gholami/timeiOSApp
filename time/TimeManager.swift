@@ -61,6 +61,9 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
 
     private var currentTimer: AnyCancellable?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    @Published var lastSummaryWork: TimeInterval = 0
+    @Published var lastSummaryPause: TimeInterval = 0
+    private var sent5h45mWarning = false
     private var sent6HourWarning = false
     private var sent9HourWarning = false
     private var sent10HourWarning = false
@@ -117,7 +120,11 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
 
     func startWork() {
         LogManager.shared.log("Attempting to start work.")
-        if timerState == .idle { currentQuote = funnyWorkQuotes.randomElement() }
+        if timerState == .idle { 
+            currentQuote = funnyWorkQuotes.randomElement() 
+            lastSummaryWork = 0
+            lastSummaryPause = 0
+        }
         endLastActiveSegment()
         currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: testModeFactor))
         timerState = .working
@@ -143,6 +150,10 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     func finishDay() {
         LogManager.shared.log("Attempting to finish day.")
         endLastActiveSegment()
+        
+        // Aktuelle Summen sichern für die Zusammenfassung-Anzeige
+        self.lastSummaryWork = self.workSeconds
+        self.lastSummaryPause = self.pauseSeconds
 
         let dayRecord = CompletedDay(id: UUID(), date: Date(), segments: currentSegments)
         LogManager.shared.log("Created day record with \(currentSegments.count) segments.")
@@ -162,6 +173,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         currentSegments = []
         timerState = .idle
         currentQuote = nil
+        sent5h45mWarning = false
         sent6HourWarning = false
         sent9HourWarning = false
         sent10HourWarning = false
@@ -198,6 +210,8 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         let days = self.completedDays
         let state = self.timerState
         let testMode = self.testModeActive
+        let summaryW = self.lastSummaryWork
+        let summaryP = self.lastSummaryPause
         
         DispatchQueue.global(qos: .userInitiated).async {
             guard let sharedDefaults = UserDefaults(suiteName: AppGroup.identifier) else { 
@@ -213,6 +227,8 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
                 sharedDefaults.set(encodedSegments, forKey: "currentSegments")
                 sharedDefaults.set(testMode, forKey: "testModeActive")
                 sharedDefaults.set(state.rawValue, forKey: "timerState")
+                sharedDefaults.set(summaryW, forKey: "lastSummaryWork")
+                sharedDefaults.set(summaryP, forKey: "lastSummaryPause")
                 
                 // Important for AppGroup sync
                 sharedDefaults.synchronize()
@@ -238,6 +254,13 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
                 self.completedDays = decodedDays 
                 LogManager.shared.log("Loaded \(decodedDays.count) completed days.")
             }
+        }
+
+        let summaryW = sharedDefaults.double(forKey: "lastSummaryWork")
+        let summaryP = sharedDefaults.double(forKey: "lastSummaryPause")
+        DispatchQueue.main.async {
+            self.lastSummaryWork = summaryW
+            self.lastSummaryPause = summaryP
         }
         
         if let savedSegments = sharedDefaults.data(forKey: "currentSegments"),
@@ -283,7 +306,11 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     private func checkBreakRules() {
-        if !sent6HourWarning && workSeconds >= (345 * 60) && pauseSeconds < (30 * 60) {
+        if !sent5h45mWarning && workSeconds >= (345 * 60) && pauseSeconds < (30 * 60) {
+            sendNotification(title: "Pause fällig (in 15 Min)!", body: "Nach 6 Stunden Arbeit sind 30 Minuten Pause gesetzlich vorgeschrieben. Noch 15 Minuten bis dahin.")
+            sent5h45mWarning = true
+        }
+        if !sent6HourWarning && workSeconds >= (360 * 60) && pauseSeconds < (30 * 60) {
             sendNotification(title: "Pause fällig (30 Min)!", body: "Nach 6 Stunden Arbeit sind 30 Minuten Pause gesetzlich vorgeschrieben.")
             sent6HourWarning = true
         }

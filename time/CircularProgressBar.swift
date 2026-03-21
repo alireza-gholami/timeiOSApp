@@ -91,6 +91,16 @@ struct CircularProgressBar: View {
                         .position(positionForAngle(angle: positionAngleFrom12Clock(initialTimeOffsetAngleFrom12Clock + tenHourAngle), center: center, textRadius: textRadius))
                         .rotationEffect(.degrees(0))
                 }
+
+                // Central Summary
+                VStack(spacing: 2) {
+                    Text("Arbeit: \(timeFormatted(timeManager.timerState == .idle && timeManager.lastSummaryWork > 0 ? timeManager.lastSummaryWork : timeManager.workSeconds))")
+                        .foregroundColor(.green)
+                    Text("Pause: \(timeFormatted(timeManager.timerState == .idle && timeManager.lastSummaryPause > 0 ? timeManager.lastSummaryPause : timeManager.pauseSeconds))")
+                        .foregroundColor(.orange)
+                }
+                .font(.system(size: 10))
+                .bold()
             }
             // No rotation on ZStack, as arcs and text positions are now correctly calculated relative to 0=12 o'clock, CW
             .frame(width: geometry.size.width, height: geometry.size.height) // Ensure ZStack respects GeometryReader's frame
@@ -107,6 +117,13 @@ struct CircularProgressBar: View {
     // Helper to convert 0=12 o'clock CW to 0=3 o'clock CCW for positionForAngle
     private func positionAngleFrom12Clock(_ angleFrom12Clock: Angle) -> Angle {
         return Angle.degrees(90) - angleFrom12Clock
+    }
+
+    private func timeFormatted(_ totalSeconds: TimeInterval) -> String {
+        let seconds: Int = Int(totalSeconds.truncatingRemainder(dividingBy: 60))
+        let minutes: Int = Int((totalSeconds / 60).truncatingRemainder(dividingBy: 60))
+        let hours: Int = Int(totalSeconds / 3600)
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }
 

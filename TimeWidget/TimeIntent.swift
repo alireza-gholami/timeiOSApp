@@ -16,7 +16,6 @@ struct ToggleTimerIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        // Fix for Swift 6 Actor isolation: Accessing identifier from AppGroup
         let groupID = "group.com.alireza.Widget" 
         let sharedDefaults = UserDefaults(suiteName: groupID)
         
@@ -33,34 +32,52 @@ struct ToggleTimerIntent: AppIntent {
         let testModeActive = sharedDefaults?.bool(forKey: "testModeActive") ?? false
         let factor: Double = testModeActive ? 300.0 : 1.0
         
-        // Aktuelles Segment beenden, falls vorhanden
-        if let lastIndex = currentSegments.indices.last, currentSegments[lastIndex].endTime == nil {
-            currentSegments[lastIndex].endTime = Date()
-        }
-        
-        // Neue Aktion ausführen
         switch action {
-        case "work", "resume":
-            currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: factor))
-            sharedDefaults?.set(TimerState.working.rawValue, forKey: "timerState")
-        case "pause":
-            currentSegments.append(TimeSegment(type: .pause, startTime: Date(), accelerationFactor: factor))
-            sharedDefaults?.set(TimerState.pausing.rawValue, forKey: "timerState")
-        case "stop":
-            if !currentSegments.isEmpty {
-                // Tag in die Historie speichern
-                let newDay = CompletedDay(id: UUID(), date: Date(), segments: currentSegments)
-                completedDays.append(newDay)
-                
-                // Historie speichern
-                if let encodedDays = try? JSONEncoder().encode(completedDays) {
-                    sharedDefaults?.set(encodedDays, forKey: "completedDays")
-                }
+        case "toggleTestMode":
+            let newState = !testModeActive
+            sharedDefaults?.set(newState, forKey: "testModeActive")
+            if let lastIndex = currentSegments.indices.last, currentSegments[lastIndex].endTime == nil {
+                var updatedSegment = currentSegments[lastIndex]
+                updatedSegment.accelerationFactor = newState ? 300.0 : 1.0
+                currentSegments[lastIndex] = updatedSegment
             }
             
-            // Alles zurücksetzen
-            currentSegments = []
-            sharedDefaults?.set(TimerState.idle.rawValue, forKey: "timerState")
+        case "work", "resume", "pause", "stop":
+            // Aktuelles Segment beenden für Statusänderungen
+            if let lastIndex = currentSegments.indices.last, currentSegments[lastIndex].endTime == nil {
+                var updatedSegment = currentSegments[lastIndex]
+                updatedSegment.endTime = Date()
+                currentSegments[lastIndex] = updatedSegment
+            }
+            
+            if action == "work" || action == "resume" {
+                currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: factor))
+                sharedDefaults?.set(TimerState.working.rawValue, forKey: "timerState")
+            } else if action == "pause" {
+                currentSegments.append(TimeSegment(type: .pause, startTime: Date(), accelerationFactor: factor))
+                sharedDefaults?.set(TimerState.pausing.rawValue, forKey: "timerState")
+            } else if action == "stop" {
+                if !currentSegments.isEmpty {
+                    // Tag in die Historie speichern
+                    let newDay = CompletedDay(id: UUID(), date: Date(), segments: currentSegments)
+                    completedDays.append(newDay)
+                    
+                    if let encodedDays = try? JSONEncoder().encode(completedDays) {
+                        sharedDefaults?.set(encodedDays, forKey: "completedDays")
+                    }
+                    
+                    // Letzte Zusammenfassung für Widget sichern
+                    let totalWork = currentSegments.filter { $0.type == .work }.reduce(0) { $0 + $1.duration }
+                    let totalPause = currentSegments.filter { $0.type == .pause }.reduce(0) { $0 + $1.duration }
+                    sharedDefaults?.set(totalWork, forKey: "lastSummaryWork")
+                    sharedDefaults?.set(totalPause, forKey: "lastSummaryPause")
+                }
+                
+                // Alles zurücksetzen
+                currentSegments = []
+                sharedDefaults?.set(TimerState.idle.rawValue, forKey: "timerState")
+            }
+            
         default:
             break
         }
