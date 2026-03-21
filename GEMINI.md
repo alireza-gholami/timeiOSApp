@@ -16,9 +16,10 @@ An iOS Time Tracking application built with SwiftUI, featuring a Home Screen Wid
 
 ## Key Features & Rules
 - **Break Rules**: 
-    - 5:45h: Warning notification (15 mins before mandatory break).
-    - 6:00h: Mandatory 30-minute break notification.
-    - 9:00h: Mandatory 45-minute break notification.
+    - 5:45h: Warning notification (15 mins before mandatory 30 min break).
+    - 6:00h: Mandatory 30-minute break notification (if < 30 min total).
+    - 8:45h: Warning notification (15 mins before mandatory 45 min break).
+    - 9:00h: Mandatory 45-minute break notification (if < 45 min total).
     - 10:00h: Maximum working time reached notification.
 - **Test Mode**: Accelerates time by 300x for testing.
 - **AppGroup**: Uses `group.com.alireza.Widget` for data sharing between the app and its extensions.
@@ -28,7 +29,7 @@ An iOS Time Tracking application built with SwiftUI, featuring a Home Screen Wid
 - **UI Summary Update**: Progress bars (Linear and Circular) now display the last finished day's summary when the app is in `idle` state, ensuring the user can see their results after clicking "Tag beenden".
 - **Notification Fix**: Confirmed notifications are working. Fixed reset flags to ensure consistency across sessions.
 - **Start Reset**: When a new day is started via "Start Arbeitszeit", the previous summary is cleared (set to 0) to begin fresh.
-- **Widget Update**: Added a lightning bolt icon (`bolt.fill`) to the widget's status bar when Test Mode is active.
+- **Widget Update**: Added a lightning bolt icon (`bolt.fill`) to the widget's status bar when Test Mode is active. Interactive widget buttons now trigger notification scheduling even when the app is closed.
 
 ## Development Guidelines
 - Always update `GEMINI.md` after significant changes.

@@ -68,6 +68,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     @Published var lastSummaryPause: TimeInterval = 0
     private var sent5h45mWarning = false
     private var sent6HourWarning = false
+    private var sent8h45mWarning = false
     private var sent9HourWarning = false
     private var sent10HourWarning = false
 
@@ -132,6 +133,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: testModeFactor))
         timerState = .working
         startTimer()
+        scheduleNotifications()
     }
 
     func startPause() {
@@ -140,6 +142,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         currentSegments.append(TimeSegment(type: .pause, startTime: Date(), accelerationFactor: testModeFactor))
         timerState = .pausing
         startTimer()
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
     func resumeWork() {
@@ -148,6 +151,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         currentSegments.append(TimeSegment(type: .work, startTime: Date(), accelerationFactor: testModeFactor))
         timerState = .working
         startTimer()
+        scheduleNotifications()
     }
 
     func finishDay() {
@@ -178,8 +182,10 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         currentQuote = nil
         sent5h45mWarning = false
         sent6HourWarning = false
+        sent8h45mWarning = false
         sent9HourWarning = false
         sent10HourWarning = false
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
     private func endLastActiveSegment() {
@@ -319,17 +325,83 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         sendNotification(title: "Test Push", body: "Notifications are working correctly!")
     }
 
+    func scheduleNotifications() {
+        // Zuerst alte ausstehende löschen
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        
+        let workSec = workSeconds
+        let pauseSec = pauseSeconds
+        
+        // Helfer zum Planen einer Benachrichtigung in der Zukunft
+        func scheduleAtWorkTime(milestoneMinutes: Double, identifier: String, title: String, body: String, condition: Bool) {
+            guard condition else { return }
+            
+            let milestoneSeconds = milestoneMinutes * 60
+            let secondsUntilMilestone = (milestoneSeconds - workSec) / testModeFactor
+            
+            if secondsUntilMilestone > 0 {
+                let content = UNMutableNotificationContent()
+                content.title = title
+                content.body = body
+                content.sound = .default
+                
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secondsUntilMilestone, repeats: false)
+                let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+                UNUserNotificationCenter.current().add(request)
+            }
+        }
+
+        // 5:45h Warning
+        scheduleAtWorkTime(milestoneMinutes: 345, 
+                          identifier: "break_warn_545", 
+                          title: "Pause fällig (in 15 Min)!", 
+                          body: "Nach 6 Stunden Arbeit sind 30 Minuten Pause gesetzlich vorgeschrieben. Noch 15 Minuten bis dahin.",
+                          condition: pauseSec < (30 * 60))
+
+        // 6:00h Mandatory
+        scheduleAtWorkTime(milestoneMinutes: 360, 
+                          identifier: "break_warn_600", 
+                          title: "Pause fällig (30 Min)!", 
+                          body: "6 Stunden Arbeit erreicht! Du musst jetzt mindestens 30 Minuten Pause gemacht haben.",
+                          condition: pauseSec < (30 * 60))
+
+        // 8:45h Warning
+        scheduleAtWorkTime(milestoneMinutes: 525, 
+                          identifier: "break_warn_845", 
+                          title: "Pause fällig (in 15 Min)!", 
+                          body: "Nach 9 Stunden Arbeit sind 45 Minuten Pause gesetzlich vorgeschrieben. Noch 15 Minuten bis dahin.",
+                          condition: pauseSec < (45 * 60))
+
+        // 9:00h Mandatory
+        scheduleAtWorkTime(milestoneMinutes: 540, 
+                          identifier: "break_warn_900", 
+                          title: "Pause fällig (45 Min)!", 
+                          body: "9 Stunden Arbeit erreicht! Du musst jetzt mindestens 45 Minuten Pause gemacht haben.",
+                          condition: pauseSec < (45 * 60))
+
+        // 10:00h Warning
+        scheduleAtWorkTime(milestoneMinutes: 600, 
+                          identifier: "limit_warn_1000", 
+                          title: "Maximale Arbeitszeit erreicht!", 
+                          body: "Die gesetzliche Höchstarbeitszeit von 10 Stunden ist erreicht.",
+                          condition: true)
+    }
+
     private func checkBreakRules() {
         if !sent5h45mWarning && workSeconds >= (345 * 60) && pauseSeconds < (30 * 60) {
             sendNotification(title: "Pause fällig (in 15 Min)!", body: "Nach 6 Stunden Arbeit sind 30 Minuten Pause gesetzlich vorgeschrieben. Noch 15 Minuten bis dahin.")
             sent5h45mWarning = true
         }
         if !sent6HourWarning && workSeconds >= (360 * 60) && pauseSeconds < (30 * 60) {
-            sendNotification(title: "Pause fällig (30 Min)!", body: "Nach 6 Stunden Arbeit sind 30 Minuten Pause gesetzlich vorgeschrieben.")
+            sendNotification(title: "Pause fällig (30 Min)!", body: "6 Stunden Arbeit erreicht! Du musst jetzt mindestens 30 Minuten Pause gemacht haben.")
             sent6HourWarning = true
         }
-        if !sent9HourWarning && workSeconds >= (525 * 60) && pauseSeconds < (45 * 60) {
-            sendNotification(title: "Pause fällig (45 Min)!", body: "Nach 9 Stunden Arbeit sind 45 Minuten Pause gesetzlich vorgeschrieben.")
+        if !sent8h45mWarning && workSeconds >= (525 * 60) && pauseSeconds < (45 * 60) {
+            sendNotification(title: "Pause fällig (in 15 Min)!", body: "Nach 9 Stunden Arbeit sind 45 Minuten Pause gesetzlich vorgeschrieben. Noch 15 Minuten bis dahin.")
+            sent8h45mWarning = true
+        }
+        if !sent9HourWarning && workSeconds >= (540 * 60) && pauseSeconds < (45 * 60) {
+            sendNotification(title: "Pause fällig (45 Min)!", body: "9 Stunden Arbeit erreicht! Du musst jetzt mindestens 45 Minuten Pause gemacht haben.")
             sent9HourWarning = true
         }
         if !sent10HourWarning && workSeconds >= (600 * 60) {
