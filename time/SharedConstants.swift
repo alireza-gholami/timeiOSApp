@@ -58,3 +58,10 @@ public struct CompletedDay: Identifiable, Codable {
         segments.filter { $0.type == .pause }.reduce(0) { $0 + $1.duration }
     }
 }
+
+public struct NotificationRecord: Identifiable, Codable {
+    public var id = UUID()
+    public var title: String
+    public var body: String
+    public var date: Date
+}

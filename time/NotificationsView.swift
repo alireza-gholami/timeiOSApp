@@ -8,42 +8,51 @@ struct NotificationsView: View {
     var body: some View {
         NavigationView {
             List {
-                if timeManager.deliveredNotifications.isEmpty {
+                if timeManager.notificationHistory.isEmpty {
                     Text("Keine Benachrichtigungen")
-                        .foregroundColor(.secondary) // Muted color for empty state
+                        .foregroundColor(.secondary)
                         .font(.body)
                 } else {
-                    ForEach(timeManager.deliveredNotifications, id: \.request.identifier) { notification in
-                        VStack(alignment: .leading, spacing: 5) { // Added spacing
-                            Text(notification.request.content.title)
+                    ForEach(timeManager.notificationHistory.reversed()) { record in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(record.title)
                                 .font(.headline)
                                 .foregroundColor(.primary)
-                            Text(notification.request.content.body)
+                            Text(record.body)
                                 .font(.subheadline)
-                                .foregroundColor(.secondary) // Muted body text
-                            Text(notification.date, style: .relative) // Displays "2 minutes ago", etc.
+                                .foregroundColor(.secondary)
+                            Text(record.date, style: .relative)
                                 .font(.caption)
-                                .foregroundColor(.secondary) // Use secondary for consistency
+                                .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 5)
                     }
+                    .onDelete { indexSet in
+                        // Handle manual deletion of specific notifications
+                        let reversedIndexSet = IndexSet(indexSet.map { timeManager.notificationHistory.count - 1 - $0 })
+                        timeManager.notificationHistory.remove(atOffsets: reversedIndexSet)
+                    }
                 }
             }
-            .listStyle(PlainListStyle()) // Minimalist list style
+            .listStyle(PlainListStyle())
             .navigationTitle("Benachrichtigungen")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Schließen") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(.accentColor) // Accent color for toolbar button
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if !timeManager.notificationHistory.isEmpty {
+                        Button("Löschen") {
+                            timeManager.notificationHistory = []
+                        }
+                    }
                 }
             }
             .onAppear {
-                // When this view appears, mark all delivered notifications as read
+                // Clear the actual system delivered notifications and badge when viewing the in-app list
                 timeManager.markNotificationsAsRead()
-                // Fetch again to ensure the list is empty (after removal)
-                timeManager.fetchDeliveredNotifications()
             }
         }
     }

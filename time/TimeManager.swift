@@ -35,6 +35,9 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
     @Published var currentQuote: String?
     @Published var deliveredNotifications: [UNNotification] = []
+    @Published var notificationHistory: [NotificationRecord] = [] {
+        didSet { saveData() }
+    }
 
     private let funnyWorkQuotes: [String] = [
         "Ich liebe Deadlines. Ich mag das Geräusch, das sie machen, wenn sie vorbeirasen.",
@@ -208,6 +211,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         // Capture data safely on main thread
         let segments = self.currentSegments
         let days = self.completedDays
+        let notifications = self.notificationHistory
         let state = self.timerState
         let testMode = self.testModeActive
         let summaryW = self.lastSummaryWork
@@ -222,9 +226,11 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
             do {
                 let encodedDays = try JSONEncoder().encode(days)
                 let encodedSegments = try JSONEncoder().encode(segments)
+                let encodedNotifications = try JSONEncoder().encode(notifications)
                 
                 sharedDefaults.set(encodedDays, forKey: "completedDays")
                 sharedDefaults.set(encodedSegments, forKey: "currentSegments")
+                sharedDefaults.set(encodedNotifications, forKey: "notificationHistory")
                 sharedDefaults.set(testMode, forKey: "testModeActive")
                 sharedDefaults.set(state.rawValue, forKey: "timerState")
                 sharedDefaults.set(summaryW, forKey: "lastSummaryWork")
@@ -253,6 +259,14 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
             DispatchQueue.main.async { 
                 self.completedDays = decodedDays 
                 LogManager.shared.log("Loaded \(decodedDays.count) completed days.")
+            }
+        }
+
+        if let savedHistory = sharedDefaults.data(forKey: "notificationHistory"),
+           let decodedHistory = try? JSONDecoder().decode([NotificationRecord].self, from: savedHistory) {
+            DispatchQueue.main.async {
+                self.notificationHistory = decodedHistory
+                LogManager.shared.log("Loaded \(decodedHistory.count) notifications.")
             }
         }
 
@@ -331,6 +345,12 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+        
+        // Add to persistent history
+        let record = NotificationRecord(title: title, body: body, date: Date())
+        DispatchQueue.main.async {
+            self.notificationHistory.append(record)
+        }
     }
 
     func updateDay(id: UUID, workMinutes: Double, pauseMinutes: Double) {
