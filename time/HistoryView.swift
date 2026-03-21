@@ -23,6 +23,29 @@ struct HistoryView: View {
     var body: some View {
         NavigationView {
             List {
+                if !timeManager.currentSegments.isEmpty {
+                    Section(header: Text("Laufende Erfassung (Heute)")) {
+                        ForEach(Array(timeManager.currentSegments.enumerated()), id: \.element.id) { index, segment in
+                            HStack {
+                                Image(systemName: segment.type == .work ? "briefcase.fill" : "pause.fill")
+                                    .foregroundColor(segment.type == .work ? .accentColor : .orange.opacity(0.8))
+                                    .font(.caption)
+                                Text(segment.type == .work ? "Arbeit" : "Pause")
+                                    .font(.caption)
+                                Spacer()
+                                Text("\(timeFormatter.string(from: segment.startTime)) - \(segment.endTime.map { timeFormatter.string(from: $0) } ?? "Aktiv")")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .onDelete { offsets in
+                            for index in offsets {
+                                timeManager.deleteCurrentSegment(at: index)
+                            }
+                        }
+                    }
+                }
+
                 Section(header: Text("Abgeschlossene Tage")) {
                     ForEach(timeManager.completedDays.reversed()) { day in
                         VStack(alignment: .leading, spacing: 10) { // Added spacing
@@ -103,9 +126,7 @@ struct HistoryView: View {
         let reversedDays = timeManager.completedDays.reversed()
         for index in offsets {
             let dayToDelete = reversedDays[reversedDays.index(reversedDays.startIndex, offsetBy: index)]
-            if let originalIndex = timeManager.completedDays.firstIndex(where: { $0.id == dayToDelete.id }) {
-                timeManager.completedDays.remove(at: originalIndex)
-            }
+            timeManager.deleteCompletedDay(id: dayToDelete.id)
         }
     }
 }

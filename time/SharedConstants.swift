@@ -36,11 +36,11 @@ public struct TimeSegment: Identifiable, Codable {
     public var endTime: Date?
     public var accelerationFactor: TimeInterval = 1
 
-    public var duration: TimeInterval {
+    public nonisolated var duration: TimeInterval {
         (endTime ?? Date()).timeIntervalSince(startTime) * accelerationFactor
     }
     
-    public var realDuration: TimeInterval {
+    public nonisolated var realDuration: TimeInterval {
         (endTime ?? Date()).timeIntervalSince(startTime)
     }
 }
@@ -50,12 +50,12 @@ public struct CompletedDay: Identifiable, Codable {
     public var date: Date
     public var segments: [TimeSegment]
     
-    public var workDuration: TimeInterval {
-        segments.filter { $0.type == .work }.reduce(0) { $0 + $1.duration }
+    public nonisolated var workDuration: TimeInterval {
+        segments.filter { $0.type == .work }.reduce(0.0) { $0 + $1.duration }
     }
     
-    public var pauseDuration: TimeInterval {
-        segments.filter { $0.type == .pause }.reduce(0) { $0 + $1.duration }
+    public nonisolated var pauseDuration: TimeInterval {
+        segments.filter { $0.type == .pause }.reduce(0.0) { $0 + $1.duration }
     }
 }
 

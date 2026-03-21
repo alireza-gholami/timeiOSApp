@@ -47,6 +47,7 @@ struct EditDayView: View {
                         for segment in editableSegments {
                             timeManager.updateSegment(forDayId: day.id, segmentId: segment.id, newStartTime: segment.startTime, newEndTime: segment.endTime)
                         }
+                        timeManager.recalculateLastSummary(forDayId: day.id)
                         presentationMode.wrappedValue.dismiss()
                     }
                     .font(.headline)

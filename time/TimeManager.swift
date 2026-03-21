@@ -392,4 +392,42 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         }
         return lines.joined(separator: "\n")
     }
+
+    func deleteCompletedDay(id: UUID) {
+        if let index = completedDays.firstIndex(where: { $0.id == id }) {
+            let day = completedDays[index]
+            // If we delete the day that currently provides the summary, reset the summary
+            if lastSummaryWork == day.workDuration && lastSummaryPause == day.pauseDuration {
+                lastSummaryWork = 0
+                lastSummaryPause = 0
+            }
+            completedDays.remove(at: index)
+        }
+    }
+
+    func deleteCurrentSegment(at index: Int) {
+        guard currentSegments.indices.contains(index) else { return }
+        currentSegments.remove(at: index)
+        
+        if currentSegments.isEmpty {
+            reset()
+        } else if let last = currentSegments.last, last.endTime != nil {
+            // If the last segment now has an end time, stop the timer and go to idle-ish state
+            stopTimer()
+            timerState = .idle
+        }
+    }
+
+    func recalculateLastSummary(forDayId dayId: UUID) {
+        if let day = completedDays.firstIndex(where: { $0.id == dayId }) {
+            let updatedDay = completedDays[day]
+            // We don't know for sure if this was the last summary, but if it's the most recent day
+            // or if the values are close, we should probably update it.
+            // Simplified: If it's the last day in the list, update lastSummary.
+            if day == completedDays.count - 1 {
+                lastSummaryWork = updatedDay.workDuration
+                lastSummaryPause = updatedDay.pauseDuration
+            }
+        }
+    }
 }
