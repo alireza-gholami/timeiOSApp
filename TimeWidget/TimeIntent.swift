@@ -67,8 +67,8 @@ struct ToggleTimerIntent: AppIntent {
                     }
                     
                     // Letzte Zusammenfassung für Widget sichern
-                    let totalWork = currentSegments.filter { $0.type == .work }.reduce(0) { $0 + $1.duration }
-                    let totalPause = currentSegments.filter { $0.type == .pause }.reduce(0) { $0 + $1.duration }
+                    let totalWork = currentSegments.filter { $0.type == .work }.reduce(0.0) { $0 + $1.duration }
+                    let totalPause = currentSegments.filter { $0.type == .pause }.reduce(0.0) { $0 + $1.duration }
                     sharedDefaults?.set(totalWork, forKey: "lastSummaryWork")
                     sharedDefaults?.set(totalPause, forKey: "lastSummaryPause")
                 }

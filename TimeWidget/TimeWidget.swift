@@ -44,9 +44,9 @@ struct Provider: TimelineProvider {
         let lastSummaryPause = sharedDefaults?.double(forKey: "lastSummaryPause") ?? 0
         
         var totalWork = currentSegments.filter { $0.type == .work }
-            .reduce(0) { $0 + $1.duration }
+            .reduce(0.0) { $0 + $1.duration }
         var totalPause = currentSegments.filter { $0.type == .pause }
-            .reduce(0) { $0 + $1.duration }
+            .reduce(0.0) { $0 + $1.duration }
         
         // Wenn Idle und Zusammenfassung vorhanden, diese nutzen
         if timerState == .idle && lastSummaryWork > 0 {
