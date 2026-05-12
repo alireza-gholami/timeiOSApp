@@ -452,6 +452,15 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         }
     }
     
+    func updateCurrentSegment(id: UUID, newStartTime: Date, newEndTime: Date?) {
+        if let index = currentSegments.firstIndex(where: { $0.id == id }) {
+            currentSegments[index].startTime = newStartTime
+            currentSegments[index].endTime = newEndTime
+            saveData()
+            scheduleNotifications()
+        }
+    }
+
     func exportToCSV() -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"

@@ -92,7 +92,15 @@ struct TimeWidgetEntryView : View {
                 Image(systemName: iconName)
                 Text(statusText)
                 
+                Spacer()
+                
                 if #available(iOS 17.0, *) {
+                    Link(destination: URL(string: "timeapp://edit")!) {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.trailing, 4)
+
                     Button(intent: ToggleTimerIntent(action: "toggleTestMode")) {
                         Image(systemName: entry.testModeActive ? "bolt.fill" : "bolt")
                             .foregroundColor(entry.testModeActive ? .yellow : .gray)

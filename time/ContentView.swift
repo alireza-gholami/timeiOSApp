@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showingHistory: Bool = false
     @State private var showingNotifications: Bool = false // New state for notifications
     @State private var showingLogs: Bool = false // New state for logs
+    @State private var showingEditCurrent: Bool = false // New state for editing current time
     @AppStorage("isDarkMode") private var isDarkMode = false
     @State private var initialDisplayTime: Date = Date() // Capture the initial display time
     @AppStorage("isCircularTimeBar") var isCircularTimeBar: Bool = false // State for toggling time bar style
@@ -102,9 +103,20 @@ struct ContentView: View {
                 
                 Spacer() // Add a spacer to push the text down
                 
-                Text("Status: \(statusText(for: timeManager.timerState))")
-                    .font(.headline)
-                    .padding(.bottom, 10)
+                HStack {
+                    Text("Status: \(statusText(for: timeManager.timerState))")
+                        .font(.headline)
+                    
+                    if timeManager.timerState != .idle {
+                        Button {
+                            showingEditCurrent = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .padding(.bottom, 10)
                 
                 if let quote = timeManager.currentQuote {
                     VStack { // Use VStack for the box effect
@@ -211,6 +223,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingLogs) {
             LogView()
+        }
+        .sheet(isPresented: $showingEditCurrent) {
+            EditCurrentSegmentsView(timeManager: timeManager)
+        }
+        .onOpenURL { url in
+            if url.scheme == "timeapp" && url.host == "edit" {
+                showingEditCurrent = true
+            }
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)
     }
