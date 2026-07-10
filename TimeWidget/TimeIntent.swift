@@ -72,6 +72,9 @@ struct ToggleTimerIntent: AppIntent {
                     let totalPause = currentSegments.filter { $0.type == .pause }.reduce(0.0) { $0 + $1.duration }
                     sharedDefaults?.set(totalWork, forKey: "lastSummaryWork")
                     sharedDefaults?.set(totalPause, forKey: "lastSummaryPause")
+                    
+                    // Sicherstellen dass die Daten sofort geschrieben werden
+                    sharedDefaults?.synchronize()
                 }
                 
                 // Alles zurücksetzen
@@ -87,6 +90,9 @@ struct ToggleTimerIntent: AppIntent {
         if let encodedSegments = try? JSONEncoder().encode(currentSegments) {
             sharedDefaults?.set(encodedSegments, forKey: "currentSegments")
         }
+        
+        // Finales Synchronisieren für AppGroup
+        sharedDefaults?.synchronize()
         
         // Widget aktualisieren
         WidgetCenter.shared.reloadAllTimelines()

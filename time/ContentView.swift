@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var showingNotifications: Bool = false // New state for notifications
     @State private var showingLogs: Bool = false // New state for logs
     @State private var showingEditCurrent: Bool = false // New state for editing current time
+    @State private var showingFinishDayAlert: Bool = false // New state for finish day confirmation
     @AppStorage("isDarkMode") private var isDarkMode = false
     @State private var initialDisplayTime: Date = Date() // Capture the initial display time
     @AppStorage("isCircularTimeBar") var isCircularTimeBar: Bool = false // State for toggling time bar style
@@ -158,7 +159,7 @@ struct ContentView: View {
 
                 if timeManager.timerState != .idle {
                     Button("Tag beenden") {
-                        timeManager.finishDay()
+                        showingFinishDayAlert = true
                     }
                     .buttonStyle(PrimaryButtonStyle(color: .red))
                     .padding(.horizontal)
@@ -169,6 +170,14 @@ struct ContentView: View {
             .padding()
             .onAppear(perform: timeManager.requestNotificationPermission)
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Tag beenden?", isPresented: $showingFinishDayAlert) {
+                Button("Abbrechen", role: .cancel) { }
+                Button("Beenden", role: .destructive) {
+                    timeManager.finishDay()
+                }
+            } message: {
+                Text("Möchtest du die heutige Zeiterfassung wirklich abschließen?")
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {

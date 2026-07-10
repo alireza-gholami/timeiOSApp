@@ -64,6 +64,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
 
     private var currentTimer: AnyCancellable?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var isLoading = false
     @Published var lastSummaryWork: TimeInterval = 0
     @Published var lastSummaryPause: TimeInterval = 0
     private var sent5h45mWarning = false
@@ -86,12 +87,9 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     @objc private func appMovedToBackground() {
         LogManager.shared.log("App moved to background.")
         saveData()
-        backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
+        backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
             self?.endBackgroundTask()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            self?.endBackgroundTask()
-        }
+        })
     }
     
     @objc private func appMovedToForeground() {
@@ -155,7 +153,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func finishDay() {
-        LogManager.shared.log("Attempting to finish day.")
+        LogManager.shared.log("ACTION: finishDay() called. Current work: \(workSeconds)s, pause: \(pauseSeconds)s")
         endLastActiveSegment()
         
         // Aktuelle Summen sichern für die Zusammenfassung-Anzeige
@@ -170,12 +168,12 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         // Wait a bit to ensure the save from completedDays.didSet is initiated
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             LogManager.shared.log("Resetting state after finishDay.")
-            self.reset()
+            self.reset(source: "finishDay")
         }
     }
 
-    func reset() {
-        LogManager.shared.log("Resetting TimeManager state.")
+    func reset(source: String = "manual") {
+        LogManager.shared.log("ACTION: reset() called from source: \(source)")
         stopTimer()
         currentSegments = []
         timerState = .idle
@@ -214,6 +212,11 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func saveData() {
+        guard !isLoading else { 
+            // LogManager.shared.log("Skipping save because isLoading is true")
+            return 
+        }
+        
         // Capture data safely on main thread
         let segments = self.currentSegments
         let days = self.completedDays
@@ -254,46 +257,65 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     }
 
     func loadData() {
-        LogManager.shared.log("Loading data from AppGroup...")
+        LogManager.shared.log("ACTION: Loading data from AppGroup...")
+        isLoading = true
+        
         guard let sharedDefaults = UserDefaults(suiteName: AppGroup.identifier) else { 
             LogManager.shared.log("CRITICAL: Could not access AppGroup for loading!")
+            isLoading = false
             return 
         }
         
-        if let savedDays = sharedDefaults.data(forKey: "completedDays"),
-           let decodedDays = try? JSONDecoder().decode([CompletedDay].self, from: savedDays) {
-            DispatchQueue.main.async { 
-                self.completedDays = decodedDays 
-                LogManager.shared.log("Loaded \(decodedDays.count) completed days.")
-            }
-        }
-
-        if let savedHistory = sharedDefaults.data(forKey: "notificationHistory"),
-           let decodedHistory = try? JSONDecoder().decode([NotificationRecord].self, from: savedHistory) {
-            DispatchQueue.main.async {
-                self.notificationHistory = decodedHistory
-                LogManager.shared.log("Loaded \(decodedHistory.count) notifications.")
-            }
-        }
-
+        // Daten lokal laden
+        let savedDays = sharedDefaults.data(forKey: "completedDays")
+        let decodedDays = savedDays.flatMap { try? JSONDecoder().decode([CompletedDay].self, from: $0) }
+        
+        let savedHistory = sharedDefaults.data(forKey: "notificationHistory")
+        let decodedHistory = savedHistory.flatMap { try? JSONDecoder().decode([NotificationRecord].self, from: $0) }
+        
         let summaryW = sharedDefaults.double(forKey: "lastSummaryWork")
         let summaryP = sharedDefaults.double(forKey: "lastSummaryPause")
+        
+        let savedSegments = sharedDefaults.data(forKey: "currentSegments")
+        let decodedSegments = savedSegments.flatMap { try? JSONDecoder().decode([TimeSegment].self, from: $0) }
+        
+        let stateString = sharedDefaults.string(forKey: "timerState") ?? "idle"
+        let loadedTimerState = TimerState(rawValue: stateString) ?? .idle
+        let testMode = sharedDefaults.bool(forKey: "testModeActive")
+
         DispatchQueue.main.async {
+            if let days = decodedDays {
+                self.completedDays = days
+                LogManager.shared.log("Loaded \(days.count) completed days.")
+            }
+            
+            if let history = decodedHistory {
+                self.notificationHistory = history
+                LogManager.shared.log("Loaded \(history.count) notifications.")
+            }
+            
             self.lastSummaryWork = summaryW
             self.lastSummaryPause = summaryP
-        }
-        
-        if let savedSegments = sharedDefaults.data(forKey: "currentSegments"),
-           let decodedSegments = try? JSONDecoder().decode([TimeSegment].self, from: savedSegments) {
-            DispatchQueue.main.async {
-                self.currentSegments = decodedSegments
-                let stateString = sharedDefaults.string(forKey: "timerState") ?? "idle"
-                self.timerState = TimerState(rawValue: stateString) ?? .idle
-                LogManager.shared.log("Loaded \(decodedSegments.count) segments. State: \(self.timerState.rawValue)")
-                if !self.currentSegments.isEmpty && self.currentSegments.last?.endTime == nil {
-                    self.startTimer()
+            self.testModeActive = testMode
+            
+            if let segments = decodedSegments {
+                // Safeguard: Don't overwrite running session with empty data
+                if segments.isEmpty && loadedTimerState != .idle {
+                    LogManager.shared.log("WARNING: Loaded empty segments while state was \(stateString)! Preventing overwrite.")
+                } else {
+                    self.currentSegments = segments
+                    self.timerState = loadedTimerState
+                    LogManager.shared.log("Loaded \(segments.count) segments. State: \(self.timerState.rawValue)")
+                    
+                    if !self.currentSegments.isEmpty && self.currentSegments.last?.endTime == nil {
+                        self.startTimer()
+                    }
                 }
             }
+            
+            // Erst jetzt wieder Speichern erlauben
+            self.isLoading = false
+            LogManager.shared.log("Loading completed, isLoading set to false.")
         }
     }
     
@@ -491,7 +513,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         currentSegments.remove(at: index)
         
         if currentSegments.isEmpty {
-            reset()
+            reset(source: "deleteCurrentSegment")
         } else if let last = currentSegments.last, last.endTime != nil {
             // If the last segment now has an end time, stop the timer and go to idle-ish state
             stopTimer()
