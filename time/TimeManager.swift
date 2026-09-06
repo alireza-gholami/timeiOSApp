@@ -95,6 +95,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
     @objc private func appMovedToForeground() {
         LogManager.shared.log("App moved to foreground.")
         loadData()
+        checkMidnightTransition()
         endBackgroundTask()
     }
     
@@ -152,7 +153,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         scheduleNotifications()
     }
 
-    func finishDay() {
+    func finishDay(at date: Date = Date()) {
         LogManager.shared.log("ACTION: finishDay() called. Current work: \(workSeconds)s, pause: \(pauseSeconds)s")
         endLastActiveSegment()
         
@@ -160,7 +161,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         self.lastSummaryWork = self.workSeconds
         self.lastSummaryPause = self.pauseSeconds
 
-        let dayRecord = CompletedDay(id: UUID(), date: Date(), segments: currentSegments)
+        let dayRecord = CompletedDay(id: UUID(), date: date, segments: currentSegments)
         LogManager.shared.log("Created day record with \(currentSegments.count) segments.")
         
         self.completedDays.append(dayRecord)
@@ -193,6 +194,24 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
         }
     }
 
+    private var virtualCurrentDate: Date {
+        guard let firstSegment = currentSegments.first else { return Date() }
+        let realElapsed = Date().timeIntervalSince(firstSegment.startTime)
+        let virtualElapsed = realElapsed * firstSegment.accelerationFactor
+        return firstSegment.startTime.addingTimeInterval(virtualElapsed)
+    }
+
+    func checkMidnightTransition() {
+        guard !currentSegments.isEmpty else { return }
+        guard let firstSegment = currentSegments.first else { return }
+        
+        let calendar = Calendar.current
+        if !calendar.isDate(firstSegment.startTime, inSameDayAs: virtualCurrentDate) {
+            LogManager.shared.log("Midnight transition detected! Auto-finishing previous day.")
+            finishDay(at: firstSegment.startTime)
+        }
+    }
+
     private func startTimer() {
         if currentTimer == nil {
             LogManager.shared.log("Timer starting.")
@@ -200,6 +219,7 @@ class TimeManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate 
                 .autoconnect()
                 .sink { [weak self] _ in
                     self?.objectWillChange.send()
+                    self?.checkMidnightTransition()
                     self?.checkBreakRules()
                 }
         }
